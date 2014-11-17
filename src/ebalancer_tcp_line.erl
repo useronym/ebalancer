@@ -25,11 +25,11 @@ start_link(Port) ->
 
 %% @private
 handle_accept(_Socket) ->
-    {ok, #state{name = syslog1}}.
+    {ok, #state{name = syslog}}.
 
 %% @private
 handle_tcp(_Socket, Data, State) ->
-    gen_server:cast(balancer, {State#state.name, Data}),
+    gen_server:cast(balancer, {data, State#state.name, Data}),
     {ok, State}.
 
 %% @private
