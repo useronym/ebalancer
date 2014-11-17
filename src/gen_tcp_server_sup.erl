@@ -47,9 +47,7 @@ init([HandlerModule, Port, UserOpts]) ->
     %% Open listening socket
     Opts = UserOpts ++ ?GEN_TCP_SERVER_OPTS,
     {ok, LSocket} = gen_tcp:listen(Port, remove_opts(Opts)),
-
-    HandlerSpec = {gen_tcp_server_handler, {gen_tcp_server_handler, start_link, [LSocket, HandlerModule]},
-                   temporary, infinity, worker, [gen_tcp_server_handler]},
+    HandlerSpec = {gen_tcp_server_handler, {gen_tcp_server_handler, start_link, [LSocket, HandlerModule]}, temporary, infinity, worker, [gen_tcp_server_handler]},
     {ok, {{simple_one_for_one, 0, 1}, [HandlerSpec]}}.
 
 %%------------------------------------------------------------------------------
