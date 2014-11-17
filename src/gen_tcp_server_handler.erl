@@ -73,8 +73,7 @@ handle_info(timeout, #state{supervisor = Supervisor, handler = HandlerModule, ls
 
             case HandlerModule:handle_accept(Socket) of
                 {ok, HandlerState} ->
-                    {noreply, State#state{socket = Socket,
-                                          state = HandlerState}};
+                    {noreply, State#state{socket = Socket, state = HandlerState}};
                 {stop, Reason} ->
                     {stop, {handle_accept_error, Reason}, State};
                 _ ->
