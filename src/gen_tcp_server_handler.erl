@@ -57,9 +57,7 @@ start_link(LSocket, HandlerModule) ->
 init([Supervisor, LSocket, HandlerModule]) ->
     %% Timeout 0 will send a timeout message to the gen_server
     %% to handle gen_tcp:accept before any other message.
-    {ok, #state{supervisor = Supervisor,
-                handler = HandlerModule,
-                lsocket = LSocket}, 0}.
+    {ok, #state{supervisor = Supervisor, handler = HandlerModule, lsocket = LSocket}, 0}.
 
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
@@ -67,8 +65,7 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info(timeout, #state{supervisor = Supervisor, handler = HandlerModule,
-                            lsocket = LSocket} = State) ->
+handle_info(timeout, #state{supervisor = Supervisor, handler = HandlerModule, lsocket = LSocket} = State) ->
     case gen_tcp:accept(LSocket) of
         {ok, Socket} ->
             %% Start new child to wait for the next connection.
@@ -86,9 +83,7 @@ handle_info(timeout, #state{supervisor = Supervisor, handler = HandlerModule,
         {error, Reason} ->
             {stop, {gen_tcp_accept_error, Reason}, State}
     end;
-handle_info({tcp, Socket, Data}, #state{handler = HandlerModule,
-                                        socket = Socket,
-                                        state = HandlerState} = State) ->
+handle_info({tcp, Socket, Data}, #state{handler = HandlerModule, socket = Socket, state = HandlerState} = State) ->
     inet:setopts(Socket, [{active, once}]),
 
     case HandlerModule:handle_tcp(Socket, Data, HandlerState) of
@@ -106,8 +101,7 @@ handle_info({tcp_error, _Socket, Reason}, State) ->
 handle_info(_Info, State) ->
     {noreply, State}.
 
-terminate(Reason, #state{handler = HandlerModule, socket = Socket,
-                         state = HandlerState}) ->
+terminate(Reason, #state{handler = HandlerModule, socket = Socket, state = HandlerState}) ->
     %% Close the sockets
     if
         Socket /= undefined ->

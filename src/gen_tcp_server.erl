@@ -45,14 +45,12 @@
 %%------------------------------------------------------------------------------
 
 %% @doc Start gen_tcp_server with default options.
--spec start_link(atom(), integer()) -> {ok, Pid :: pid()} | ignore |
-                                       {error, Reason :: term()}.
+-spec start_link(atom(), integer()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}.
 start_link(HandlerModule, Port) ->
     start_link(HandlerModule, Port, []).
 
 %% @doc Start gen_tcp_server with custom options.
--spec start_link(atom(), integer(), [term()]) -> {ok, Pid :: pid()} | ignore |
-                                                 {error, Reason :: term()}.
+-spec start_link(atom(), integer(), [term()]) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}.
 start_link(HandlerModule, Port, Opts) ->
     {ok, Pid} = gen_tcp_server_sup:start_link(HandlerModule, Port, Opts),
     N = case lists:keyfind(pool, 1, Opts) of
