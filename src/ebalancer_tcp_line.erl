@@ -29,7 +29,7 @@ handle_accept(_Socket) ->
 
 %% @private
 handle_tcp(_Socket, Data, State) ->
-    gen_server:cast(balancer, {data, State#state.name, Data}),
+    ebalancer_balancer:receive_data(State#state.name, Data),
     {ok, State}.
 
 %% @private
