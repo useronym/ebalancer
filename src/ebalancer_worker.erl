@@ -1,5 +1,4 @@
 -module(ebalancer_worker).
--author("osense").
 
 -behaviour(gen_server).
 
@@ -8,6 +7,8 @@
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+
+-define(RECEIVE_TIMEOUT, 1000).
 
 -record(state, {}).
 
@@ -19,7 +20,7 @@ start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
 receive_batch(Worker, List) ->
-    gen_server:call(Worker, {receive_batch, List}).
+    gen_server:call(Worker, {receive_batch, List}, ?RECEIVE_TIMEOUT).
 
 
 %%%-----------------------------------------------------------------------------
@@ -32,7 +33,10 @@ init([]) ->
 
 handle_call({receive_batch, List}, _From, State) ->
     io:format("worker ~p got ~p items~n", [self(), length(List)]),
-    %% start processing here, but don't block - reply with ok
+    spawn(fun() ->
+        lists:map(fun(I) -> erlang:md5(I) end, List),
+        io:format("worker finished processing a batch~n")
+    end),
     {reply, ok, State}.
 
 handle_cast(_Request, State) ->
