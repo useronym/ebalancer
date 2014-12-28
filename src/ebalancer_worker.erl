@@ -28,13 +28,13 @@ receive_batch(Worker, List) ->
 %%%-----------------------------------------------------------------------------
 
 init([]) ->
-    ebalancer_balancer:register_as_worker(),
+    ok = ebalancer_balancer:register_as_worker(),
     {ok, #state{}}.
 
 handle_call({receive_batch, List}, _From, State) ->
     io:format("worker ~p got ~p items~n", [self(), length(List)]),
     spawn(fun() ->
-        lists:map(fun(I) -> erlang:md5(I) end, List),
+        lists:map(fun erlang:md5/1, List),
         io:format("worker finished processing a batch~n")
     end),
     {reply, ok, State}.

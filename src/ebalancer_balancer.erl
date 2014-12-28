@@ -49,7 +49,10 @@ handle_cast({receive_data, _From, Data}, State = #state{buffer = List}) ->
 
 handle_info(timeout, State) ->
     {ok, NewState} = dispatch(State),
-    {noreply, NewState}.
+    {noreply, NewState};
+%% discard messages caused by worker timeouts that were just late with the reply
+handle_info({Ref, _}, State) when is_reference(Ref) ->
+    {noreply, State}.
 
 terminate(_Reason, _State) ->
     ok.
@@ -62,15 +65,17 @@ code_change(_OldVsn, State, _Extra) ->
 %%% private functions
 %%%-----------------------------------------------------------------------------
 
-%% Assumes non-empty worker queue, crashes otherwise.
 dispatch(State) ->
-    {{value, Worker}, Q} = queue:out(State#state.workers),
-    try
-        ebalancer_worker:receive_batch(Worker, State#state.buffer),
-        NewState = State#state{buffer = [], workers = queue:in(Worker, Q)},
-        {ok, NewState}
-    catch
-        error:E ->
-            io:format("dropping worker: failed to contact ~p (~p)~n", [Worker, E]),
-            dispatch(State#state{workers = Q})
+    case queue:out(State#state.workers) of
+        {{value, Worker}, Q} ->
+            try ebalancer_worker:receive_batch(Worker, State#state.buffer) of
+                ok ->
+                    {ok, State#state{buffer = [], workers = queue:in(Worker, Q)}}
+            catch
+                exit:{Reason, _Stack} ->
+                    io:format("dropping worker: failed to contact ~p (~p)~n", [Worker, Reason]),
+                    dispatch(State#state{workers = Q})
+            end;
+        {empty, _Q} ->
+            error
     end.
