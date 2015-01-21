@@ -12,7 +12,7 @@
 %%%-----------------------------------------------------------------------------
 
 start(_StartType, _StartArgs)->
-    start(balancer).
+    start([balancer]).
 
 start([balancer]) ->
     ebalancer_balancer:start_link();

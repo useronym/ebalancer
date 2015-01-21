@@ -8,12 +8,13 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--define(PROCNAME, {global, balancer}).
+-define(PROCNAME, {global, ?MODULE}).
 
 -record(state, {balanced_nodes = 0,
     flush_timeout = 10000,
     buffer_size = 20,
     workers = queue:new(),
+    counter = 0,
     buffer = []}).
 
 
@@ -66,11 +67,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%%-----------------------------------------------------------------------------
 
 dispatch(State) ->
+    Counter = State#state.counter,
     case queue:out(State#state.workers) of
         {{value, Worker}, Q} ->
-            try ebalancer_worker:receive_batch(Worker, State#state.buffer) of
+            try ebalancer_worker:receive_batch(Worker, Counter, State#state.buffer) of
                 ok ->
-                    {ok, State#state{buffer = [], workers = queue:in(Worker, Q)}}
+                    {ok, State#state{buffer = [], workers = queue:in(Worker, Q), counter = Counter + 1}}
             catch
                 exit:{Reason, _Stack} ->
                     io:format("dropping worker: failed to contact ~p (~p)~n", [Worker, Reason]),
