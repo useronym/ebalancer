@@ -70,7 +70,7 @@ dispatch(State) ->
     Counter = State#state.counter,
     case queue:out(State#state.workers) of
         {{value, Worker}, Q} ->
-            try ebalancer_worker:receive_batch(Worker, Counter, State#state.buffer) of
+            try ebalancer_worker:receive_batch(Worker, {Counter, State#state.buffer}) of
                 ok ->
                     {ok, State#state{buffer = [], workers = queue:in(Worker, Q), counter = Counter + 1}}
             catch
