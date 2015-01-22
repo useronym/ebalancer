@@ -8,19 +8,27 @@
 
 
 %%%-----------------------------------------------------------------------------
+%%% API functions (currently used from the start.sh script)
+%%%-----------------------------------------------------------------------------
+
+start([balancer]) ->
+    application:start(ebalancer),
+    timer:sleep(1000),
+    ebalancer_sup:start_balancer();
+start([worker]) ->
+    application:start(ebalancer),
+    {ok, Host} = inet:gethostname(),
+    true = net_kernel:connect_node(list_to_atom("ebalancer@" ++ Host)),
+    timer:sleep(5000),
+    ebalancer_sup:start_worker().
+
+
+%%%-----------------------------------------------------------------------------
 %%% Application callbacks
 %%%-----------------------------------------------------------------------------
 
 start(_StartType, _StartArgs)->
-    start([balancer]).
-
-start([balancer]) ->
-    ebalancer_balancer:start_link();
-start([worker]) ->
-    {ok, Host} = inet:gethostname(),
-    true = net_kernel:connect_node(list_to_atom("ebalancer@" ++ Host)),
-    timer:sleep(5000),
-    ebalancer_worker:start_link().
+    ebalancer_sup:start_link().
 
 stop(_State) ->
     ok.

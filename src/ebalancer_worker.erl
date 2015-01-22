@@ -58,5 +58,5 @@ dummy_function({Id, List}) ->
     Processed = lists:map(fun erlang:md5/1, List),
     random:seed(now()),
     timer:sleep(random:uniform(5000)),
-    io:format("worker finished processing batch No. ~p~n", [Id]),
+    io:format("Worker finished processing batch No. ~p~n", [Id]),
     {Id, Processed}.
