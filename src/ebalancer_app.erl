@@ -13,12 +13,11 @@
 
 start([balancer]) ->
     application:start(ebalancer),
-    timer:sleep(1000),
     ebalancer_sup:start_balancer();
 start([worker]) ->
     application:start(ebalancer),
     lists:map(fun net_kernel:connect_node/1, net_adm:world()),
-    timer:sleep(5000),
+    ok = global:sync(),
     ebalancer_sup:start_worker().
 
 
