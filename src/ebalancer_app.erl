@@ -17,8 +17,7 @@ start([balancer]) ->
     ebalancer_sup:start_balancer();
 start([worker]) ->
     application:start(ebalancer),
-    {ok, Host} = inet:gethostname(),
-    true = net_kernel:connect_node(list_to_atom("ebalancer@" ++ Host)),
+    lists:map(fun net_kernel:connect_node/1, net_adm:world()),
     timer:sleep(5000),
     ebalancer_sup:start_worker().
 
