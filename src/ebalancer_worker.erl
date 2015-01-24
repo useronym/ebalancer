@@ -28,7 +28,8 @@ receive_batch(Worker, Batch) ->
 %%%-----------------------------------------------------------------------------
 
 init([]) ->
-    ok = ebalancer_balancer:register_as_worker(),
+    lists:foreach(fun ebalancer_balancer:self_as_worker/1, [node() | nodes()]),
+    net_kernel:monitor_nodes(true),
     {ok, #state{}}.
 
 handle_call({receive_batch, Batch}, _From, State) ->
@@ -40,7 +41,8 @@ handle_call({receive_batch, Batch}, _From, State) ->
 handle_cast(_Request, State) ->
     {noreply, State}.
 
-handle_info(_Info, State) ->
+handle_info({nodeup, Node}, State) ->
+    ebalancer_balancer:self_as_worker(Node),
     {noreply, State}.
 
 terminate(_Reason, _State) ->

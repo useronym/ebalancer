@@ -16,7 +16,7 @@ start([balancer]) ->
     ebalancer_sup:start_balancer();
 start([worker]) ->
     application:start(ebalancer),
-    lists:map(fun net_kernel:connect_node/1, net_adm:world()),
+    lists:foreach(fun net_kernel:connect_node/1, net_adm:world()),
     ok = global:sync(),
     ebalancer_sup:start_worker().
 

@@ -3,12 +3,10 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, receive_data/2, register_as_worker/0]).
+-export([start_link/0, receive_data/2, self_as_worker/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
-
--define(PROCNAME, {global, ?MODULE}).
 
 -record(state, {balanced_nodes = 0,
     flush_timeout = 10000,
@@ -23,13 +21,14 @@
 %%%-----------------------------------------------------------------------------
 
 start_link() ->
-    gen_server:start_link(?PROCNAME, ?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 receive_data(From, Data) ->
-    gen_server:cast(?PROCNAME, {receive_data, From, Data}).
+    gen_server:cast(?MODULE, {receive_data, From, Data}).
 
-register_as_worker() ->
-    gen_server:call(?PROCNAME, register_worker).
+%% Calling this offers the calling process as a worker to a locally registered balancer on a given node.
+self_as_worker(NodeName) ->
+    gen_server:cast({?MODULE, NodeName}, {register_worker, self()}).
 
 
 %%%-----------------------------------------------------------------------------
@@ -39,14 +38,25 @@ register_as_worker() ->
 init([]) ->
     {ok, #state{}}.
 
-handle_call(register_worker, {Pid, _Tag}, State = #state{workers = Workers}) ->
-    {reply, ok, State#state{workers = queue:in(Pid, Workers)}}.
+
+handle_call(_Request, _From, State) ->
+    {reply, ok, State}.
+
 
 handle_cast({receive_data, _From, Data}, State = #state{buffer = List, buffer_size = Limit}) when length(List) >= Limit - 1 ->
     {ok, NewState} = dispatch(State#state{buffer = [Data | List]}),
     {noreply, NewState};
 handle_cast({receive_data, _From, Data}, State = #state{buffer = List}) ->
-    {noreply, State#state{buffer = [Data | List]}, State#state.flush_timeout}.
+    {noreply, State#state{buffer = [Data | List]}, State#state.flush_timeout};
+
+handle_cast({register_worker, Pid}, State = #state{workers = Workers}) ->
+    case queue_contains(Pid, Workers) of
+        false ->
+            {noreply, State#state{workers = queue:in(Pid, Workers)}};
+        true ->
+            {noreply, State}
+    end.
+
 
 handle_info(timeout, State) ->
     {ok, NewState} = dispatch(State),
@@ -55,8 +65,10 @@ handle_info(timeout, State) ->
 handle_info({Ref, _}, State) when is_reference(Ref) ->
     {noreply, State}.
 
+
 terminate(_Reason, _State) ->
     ok.
+
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -81,3 +93,6 @@ dispatch(State) ->
         {empty, _Q} ->
             error
     end.
+
+queue_contains(Term, Q) ->
+    lists:any(fun(X) -> X =:= Term end, queue:to_list(Q)).
