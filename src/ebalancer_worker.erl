@@ -9,6 +9,8 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -define(RECEIVE_TIMEOUT, 1000).
+%% How often the worker notifies the network of it's presence
+-define(NOTIFY_EVERY, 30000).
 
 -record(state, {}).
 
@@ -28,8 +30,7 @@ receive_batch(Worker, Batch) ->
 %%%-----------------------------------------------------------------------------
 
 init([]) ->
-    lists:foreach(fun ebalancer_balancer:self_as_worker/1, [node() | nodes()]),
-    net_kernel:monitor_nodes(true),
+    timer:send_interval(?NOTIFY_EVERY, notify),
     {ok, #state{}}.
 
 handle_call({receive_batch, Batch}, _From, State) ->
@@ -41,8 +42,8 @@ handle_call({receive_batch, Batch}, _From, State) ->
 handle_cast(_Request, State) ->
     {noreply, State}.
 
-handle_info({nodeup, Node}, State) ->
-    ebalancer_balancer:self_as_worker(Node),
+handle_info(notify, State) ->
+    lists:foreach(fun ebalancer_balancer:self_as_worker/1, [node() | nodes()]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->
@@ -57,8 +58,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%-----------------------------------------------------------------------------
 
 dummy_function({Id, List}) ->
-    Processed = lists:map(fun erlang:md5/1, List),
     random:seed(now()),
     timer:sleep(random:uniform(5000)),
     io:format("Worker finished processing batch No. ~p~n", [Id]),
-    {Id, Processed}.
+    {Id, List}.

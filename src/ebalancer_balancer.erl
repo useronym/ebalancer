@@ -52,6 +52,7 @@ handle_cast({receive_data, _From, Data}, State = #state{buffer = List}) ->
 handle_cast({register_worker, Pid}, State = #state{workers = Workers}) ->
     case queue_contains(Pid, Workers) of
         false ->
+            error_logger:info_report([{"Balancer registered a new worker", Pid}]),
             {noreply, State#state{workers = queue:in(Pid, Workers)}};
         true ->
             {noreply, State}
@@ -87,7 +88,7 @@ dispatch(State) ->
                     {ok, State#state{buffer = [], workers = queue:in(Worker, Q), counter = Counter + 1}}
             catch
                 exit:{Reason, _Stack} ->
-                    io:format("dropping worker: failed to contact ~p (~p)~n", [Worker, Reason]),
+                    error_logger:info_report([{"Balancer dropping worker", Worker}, {"Reason", Reason}]),
                     dispatch(State#state{workers = Q})
             end;
         {empty, _Q} ->
