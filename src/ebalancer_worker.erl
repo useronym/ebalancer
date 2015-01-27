@@ -8,7 +8,7 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--define(RECEIVE_TIMEOUT, 2500).
+-define(RECEIVE_TIMEOUT, 1000).
 %% How often the worker notifies the network of it's presence
 -define(NOTIFY_EVERY, 30000).
 
@@ -34,8 +34,9 @@ init([]) ->
     {ok, #state{}}.
 
 handle_call({receive_batch, Batch}, _From, State) ->
-    Processed = dummy_function(Batch),
-    ok = gen_server:call({global, ecollector}, {collect, Processed}),
+    spawn(fun() ->
+        Processed = dummy_function(Batch),
+        gen_server:call({global, ecollector}, {collect, Processed}) end),
     {reply, ok, State}.
 
 handle_cast(_Request, State) ->
