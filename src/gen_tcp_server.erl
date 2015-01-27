@@ -20,7 +20,7 @@
 -module(gen_tcp_server).
 
 %% API
--export([start_link/2,
+-export([start_link/3,
          start_link/3,
          stop/1]).
 
@@ -28,7 +28,7 @@
 %% gen_tcp_server callback definitions
 %%------------------------------------------------------------------------------
 
--callback handle_accept(Socket :: term()) ->
+-callback handle_accept(Socket :: term(), Name :: atom()) ->
     {ok, State :: term()} | {stop, Reason :: term()}.
 
 -callback handle_tcp(Socket :: term(), Data :: binary(), State :: term()) ->
@@ -45,14 +45,14 @@
 %%------------------------------------------------------------------------------
 
 %% @doc Start gen_tcp_server with default options.
--spec start_link(atom(), integer()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}.
-start_link(HandlerModule, Port) ->
-    start_link(HandlerModule, Port, []).
+-spec start_link(atom(), atom(), integer()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}.
+start_link(Name, HandlerModule, Port) ->
+    start_link(Name, HandlerModule, Port, []).
 
 %% @doc Start gen_tcp_server with custom options.
--spec start_link(atom(), integer(), [term()]) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}.
-start_link(HandlerModule, Port, Opts) ->
-    {ok, Pid} = gen_tcp_server_sup:start_link(HandlerModule, Port, Opts),
+-spec start_link(atom(), atom(), integer(), [term()]) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}.
+start_link(Name, HandlerModule, Port, Opts) ->
+    {ok, Pid} = gen_tcp_server_sup:start_link(Name, HandlerModule, Port, Opts),
     N = case lists:keyfind(pool, 1, Opts) of
             false ->
                 1;
