@@ -23,7 +23,7 @@
 -behaviour(supervisor).
 
 %% Internal API
--export([start_link/3]).
+-export([start_link/4]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -35,19 +35,19 @@
 %%------------------------------------------------------------------------------
 
 %% @doc Start the handler supervisor.
--spec start_link(atom(), integer(), term()) -> term().
-start_link(HandlerModule, Port, UserOpts) ->
-    supervisor:start_link(?MODULE, [HandlerModule, Port, UserOpts]).
+-spec start_link(atom(), atom(), integer(), term()) -> term().
+start_link(Name, HandlerModule, Port, UserOpts) ->
+    supervisor:start_link(?MODULE, [Name, HandlerModule, Port, UserOpts]).
 
 %%------------------------------------------------------------------------------
 %% Supervisor callbacks
 %%------------------------------------------------------------------------------
 
-init([HandlerModule, Port, UserOpts]) ->
+init([Name, HandlerModule, Port, UserOpts]) ->
     %% Open listening socket
     Opts = UserOpts ++ ?GEN_TCP_SERVER_OPTS,
     {ok, LSocket} = gen_tcp:listen(Port, remove_opts(Opts)),
-    HandlerSpec = {gen_tcp_server_handler, {gen_tcp_server_handler, start_link, [LSocket, HandlerModule]}, temporary, infinity, worker, [gen_tcp_server_handler]},
+    HandlerSpec = {gen_tcp_server_handler, {gen_tcp_server_handler, start_link, [LSocket, Name, HandlerModule]}, temporary, infinity, worker, [gen_tcp_server_handler]},
     {ok, {{simple_one_for_one, 0, 1}, [HandlerSpec]}}.
 
 %%------------------------------------------------------------------------------
