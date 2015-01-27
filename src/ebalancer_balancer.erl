@@ -44,7 +44,7 @@ handle_call(_Request, _From, State) ->
 
 
 handle_cast({receive_data, _From, Data}, State = #state{buffer = List, buffer_size = Limit}) when length(List) >= Limit - 1 ->
-    {ok, NewState} = dispatch(State#state{buffer = [Data | List]}),
+    NewState = dispatch(State#state{buffer = [Data | List]}),
     {noreply, NewState};
 handle_cast({receive_data, _From, Data}, State = #state{buffer = List}) ->
     {noreply, State#state{buffer = [Data | List]}, State#state.flush_timeout};
@@ -53,14 +53,14 @@ handle_cast({register_worker, Pid}, State = #state{workers = Workers}) ->
     case queue_contains(Pid, Workers) of
         false ->
             error_logger:info_report([{"Balancer registered a new worker", Pid}]),
-            {noreply, State#state{workers = queue:in(Pid, Workers)}};
+            {noreply, State#state{workers = queue:in(Pid, Workers)}, State#state.flush_timeout};
         true ->
-            {noreply, State}
+            {noreply, State, State#state.flush_timeout}
     end.
 
 
 handle_info(timeout, State) ->
-    {ok, NewState} = dispatch(State),
+    NewState = dispatch(State),
     {noreply, NewState};
 %% discard messages caused by worker timeouts that were just late with the reply
 handle_info({Ref, _}, State) when is_reference(Ref) ->
@@ -79,20 +79,24 @@ code_change(_OldVsn, State, _Extra) ->
 %%% private functions
 %%%-----------------------------------------------------------------------------
 
+dispatch(State = #state{buffer = Buffer}) when length(Buffer) == 0 ->
+    State;
 dispatch(State) ->
     Counter = State#state.counter,
     case queue:out(State#state.workers) of
         {{value, Worker}, Q} ->
             try ebalancer_worker:receive_batch(Worker, {Counter, State#state.buffer}) of
                 ok ->
-                    {ok, State#state{buffer = [], workers = queue:in(Worker, Q), counter = Counter + 1}}
+                    State#state{buffer = [], workers = queue:in(Worker, Q), counter = Counter + 1}
             catch
                 exit:{Reason, _Stack} ->
                     error_logger:info_report([{"Balancer dropping worker", Worker}, {"Reason", Reason}]),
                     dispatch(State#state{workers = Q})
             end;
         {empty, _Q} ->
-            error
+            error_logger:warning_report(["Balancer has no registered workers, buffering input",
+                {"Buffer size", length(State#state.buffer)}]),
+            State
     end.
 
 queue_contains(Term, Q) ->
