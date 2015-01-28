@@ -33,10 +33,10 @@ init([]) ->
     timer:send_interval(?NOTIFY_EVERY, notify),
     {ok, #state{}}.
 
-handle_call({receive_batch, Batch}, _From, State) ->
+handle_call({receive_batch, {Id, Batch}}, _From, State) ->
     spawn(fun() ->
-        Processed = dummy_function(Batch),
-        gen_server:call({global, ecollector}, {collect, Processed}) end),
+        Processed = lists:map(fun dummy_function/1, Batch),
+        gen_server:call({global, ecollector}, {collect, {Id, Processed}}) end),
     {reply, ok, State}.
 
 handle_cast(_Request, State) ->
@@ -57,8 +57,5 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%-----------------------------------------------------------------------------
 
-dummy_function({Id, List}) ->
-    random:seed(now()),
-    timer:sleep(random:uniform(5000)),
-    io:format("Worker finished processing batch No. ~p~n", [Id]),
-    {Id, List}.
+dummy_function(Binary) ->
+    re:split(Binary, " ", [{return, binary}]).
