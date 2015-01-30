@@ -11,14 +11,9 @@
 %%% API functions (currently used from the start.sh script)
 %%%-----------------------------------------------------------------------------
 
-start([balancer]) ->
-    application:start(ebalancer),
-    ebalancer_sup:start_balancer();
-start([worker]) ->
-    application:start(ebalancer),
+start([ebalancer]) ->
     lists:foreach(fun net_kernel:connect_node/1, net_adm:world()),
-    ok = global:sync(),
-    ebalancer_sup:start_worker().
+    application:start(ebalancer).
 
 
 %%%-----------------------------------------------------------------------------

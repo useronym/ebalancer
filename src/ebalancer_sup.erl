@@ -3,7 +3,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0, start_balancer/0, start_worker/0]).
+-export([start_link/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -19,15 +19,13 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-start_balancer() ->
-    supervisor:start_child(?MODULE, ?CHILD(ebalancer_balancer_sup, supervisor)).
-
-start_worker() ->
-    supervisor:start_child(?MODULE, ?CHILD(ebalancer_worker_sup, supervisor)).
-
 %%%-----------------------------------------------------------------------------
 %%% supervisor callbacks
 %%%-----------------------------------------------------------------------------
 
 init([]) ->
-    {ok, {{one_for_one, 5, 10}, []}}.
+    {ok, {{one_for_one, 5, 10}, [
+        ?CHILD(ebalancer_balancer, worker),
+        ?CHILD(ebalancer_worker, worker),
+        ?CHILD(ebalancer_collector, worker)
+    ]}}.
