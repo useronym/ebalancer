@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, receive_tcp/2, receive_work/3, receive_confirm/2]).
+-export([start_link/0, receive_tcp/2, receive_work/3, confirm/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -25,8 +25,8 @@ receive_tcp(From, Data) ->
 receive_work(Node, VC, Work) ->
     gen_server:cast({?MODULE, Node}, {receive_work, VC, Work}).
 
-receive_confirm(Node, VC) ->
-    gen_server:cast({?MODULE, Node}, {receive_confirm, VC}).
+confirm(Node, VC) ->
+    gen_server:cast({?MODULE, Node}, {confirm, VC}).
 
 
 %%%-----------------------------------------------------------------------------
@@ -53,13 +53,12 @@ handle_cast({receive_work, VC, Work}, State) ->
     ebalancer_worker:receive_work(VC, Work),
     {noreply, State#state{vc = NewVC}};
 
-handle_cast({receive_confirm, VC}, State) ->
+handle_cast({confirm, VC}, State) ->
     NewBuffer = lists:keydelete(VC, 1, State#state.buffer),
     {noreply, State#state{buffer = NewBuffer}}.
 
 
-%% discard messages caused by worker timeouts that were just late with the reply
-handle_info({Ref, _}, State) when is_reference(Ref) ->
+handle_info(_Info, State) ->
     {noreply, State}.
 
 

@@ -32,11 +32,10 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast({collect, VC, Node, _From, _Data}, State) ->
-    ebalancer_balancer:receive_confirm(Node, VC),
+    ebalancer_balancer:confirm(Node, VC),
     {noreply, State}.
 
-handle_info(timeout, State) ->
-    error_logger:info_report(["No input for 5s."]),
+handle_info(_Info, State) ->
     {noreply, State}.
 
 terminate(_Reason, _State) ->
@@ -48,15 +47,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% -------------------------------------------------------------------
 %% Internal functions
 %% -------------------------------------------------------------------
-
-check_pool(NextId, Pool, Fun) ->
-    case lists:keytake(NextId, 1, Pool) of
-        {value, {_Id, Batch}, NewPool} ->
-            lists:foreach(fun dummy_save_fun/1, Batch),
-            check_pool(NextId + 1, NewPool, Fun);
-        false ->
-            {NextId, Pool}
-    end.
 
 dummy_save_fun(Line) ->
     file:write_file(out, [Line, $\n], [append]).

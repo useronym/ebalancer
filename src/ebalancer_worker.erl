@@ -32,7 +32,7 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast({receive_work, VC, {Node, From, Data}}, State) ->
-    Processed = lists:map(fun dummy_function/1, Data),
+    Processed = dummy_function(Data),
     ebalancer_collector:collect(VC, Node, From, Processed),
     {noreply, State}.
 
