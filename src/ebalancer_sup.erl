@@ -26,6 +26,7 @@ start_link() ->
 init([]) ->
     {ok, {{one_for_one, 5, 10}, [
         ?CHILD(ebalancer_balancer, worker),
+        ?CHILD(ebalancer_store, worker),
         ?CHILD(ebalancer_worker, worker),
         ?CHILD(ebalancer_collector, worker)
     ]}}.

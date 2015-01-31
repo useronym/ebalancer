@@ -32,7 +32,7 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast({collect, VC, Node, _From, _Data}, State) ->
-    ebalancer_balancer:confirm(Node, VC),
+    ebalancer_store:confirm(Node, VC),
     {noreply, State}.
 
 handle_info(_Info, State) ->
