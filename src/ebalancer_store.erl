@@ -8,7 +8,8 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {store = squeue:new()}).
+-record(state, {in = [],
+    out = []}).
 
 
 %%%-----------------------------------------------------------------------------
@@ -38,11 +39,17 @@ handle_call(_Request, _From, State) ->
 
 
 handle_cast({store, VC, From, Data}, State) ->
-    {noreply, State#state{store = squeue:in({VC, From, Data}, State#state.store)}};
+    {noreply, State#state{in = [{VC, From, Data} | State#state.in]}};
 
-handle_cast({confirm, VC}, State) ->
-    NewBuffer = squeue:keydelete(VC, 1, State#state.store),
-    {noreply, State#state{store = NewBuffer}}.
+handle_cast({confirm, VC}, State = #state{in = In, out = []}) ->
+    handle_cast({confirm, VC}, State#state{in = [], out = lists:reverse(In)});
+handle_cast({confirm, VC}, State = #state{in = In, out = Out}) ->
+    case lists:keytake(VC, 1, Out) of
+        false ->
+            {noreply, State#state{in = lists:keydelete(VC, 1, In)}};
+        {value, _, NewOut} ->
+            {noreply, State#state{out = NewOut}}
+    end.
 
 
 handle_info(_Info, State) ->
