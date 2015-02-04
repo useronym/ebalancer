@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, receive_work/2]).
+-export([start_link/0, send_work/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -17,8 +17,8 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-receive_work(VC, NFD) ->
-    gen_server:cast(?MODULE, {receive_work, VC, NFD}).
+send_work(VC, NFD) ->
+    gen_server:cast(?MODULE, {send_work, VC, NFD}).
 
 
 %%%-----------------------------------------------------------------------------
@@ -31,7 +31,7 @@ init([]) ->
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
-handle_cast({receive_work, VC, {Node, From, Data}}, State) ->
+handle_cast({send_work, VC, {Node, From, Data}}, State) ->
     Processed = dummy_function(Data),
     ebalancer_collector:collect(VC, Node, From, Processed),
     {noreply, State}.
