@@ -8,7 +8,7 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {vc = evc:new()}).
+-record(state, {vc = vclock:fresh()}).
 
 
 %%%-----------------------------------------------------------------------------
@@ -38,7 +38,7 @@ handle_call(_Request, _From, State) ->
 
 
 handle_cast({send_tcp, From, Data}, State) ->
-    NewVC = evc:event(State#state.vc),
+    NewVC = vclock:increment(State#state.vc),
     ebalancer_store:store(NewVC, From, Data),
     Nodes = nodes(), % [node() | nodes()],
     TargetNode = lists:nth(random:uniform(length(Nodes)), Nodes),
@@ -46,7 +46,7 @@ handle_cast({send_tcp, From, Data}, State) ->
     {noreply, State#state{vc = NewVC}};
 
 handle_cast({send_work, VC, NFD}, State) ->
-    NewVC = evc:merge(VC, evc:event(State#state.vc)),
+    NewVC = vclock:merge([VC, vclock:increment(State#state.vc)]),
     ebalancer_worker:send_work(VC, NFD),
     {noreply, State#state{vc = NewVC}}.
 
