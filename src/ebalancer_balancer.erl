@@ -3,12 +3,13 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, send_tcp/2, send_work/4]).
+-export([start_link/0, send_tcp/2, notify/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {vc = vclock:fresh()}).
+-record(state, {vc = vclock:fresh(),
+    marked = false}).
 
 
 %%%-----------------------------------------------------------------------------
@@ -21,8 +22,8 @@ start_link() ->
 send_tcp(From, Data) ->
     gen_server:cast(?MODULE, {send_tcp, From, Data}).
 
-send_work(Node, VC, From, Data) ->
-    gen_server:cast({?MODULE, Node}, {send_work, VC, {node(), From, Data}}).
+notify(Node, VC) ->
+    gen_server:cast({?MODULE, Node}, {notify, VC}).
 
 
 %%%-----------------------------------------------------------------------------
@@ -39,15 +40,15 @@ handle_call(_Request, _From, State) ->
 
 handle_cast({send_tcp, From, Data}, State) ->
     NewVC = vclock:increment(State#state.vc),
-    ebalancer_store:store(NewVC, From, Data),
-    Nodes = nodes(), % [node() | nodes()],
-    TargetNode = lists:nth(random:uniform(length(Nodes)), Nodes),
-    ebalancer_balancer:send_work(TargetNode, NewVC, From, Data),
+    ebalancer_store:promise(NewVC, From, Data),
+    Balancers = nodes(),
+    TargetNode = lists:nth(random:uniform(length(Balancers)), Balancers),
+    ebalancer_balancer:notify(TargetNode, NewVC),
+    ebalancer_worker:process(node(), NewVC, Data),
     {noreply, State#state{vc = NewVC}};
 
-handle_cast({send_work, VC, NFD}, State) ->
+handle_cast({notify, VC}, State) ->
     NewVC = vclock:merge([VC, vclock:increment(State#state.vc)]),
-    ebalancer_worker:send_work(VC, NFD),
     {noreply, State#state{vc = NewVC}}.
 
 
