@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, promise/3, collect/3, mark/1]).
+-export([start_link/0, promise/3, collect/3, mark/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -28,8 +28,8 @@ promise(VC, From, Data) ->
 collect(Node, VC, Data) ->
     gen_server:cast({?MODULE, Node}, {collect, VC, Data}).
 
-mark(Node) ->
-    gen_server:cast({?MODULE, Node}, mark).
+mark(Node, Ref) ->
+    gen_server:cast({?MODULE, Node}, {mark, Ref}).
 
 
 %%%-----------------------------------------------------------------------------
@@ -51,22 +51,25 @@ handle_cast({promise, VC, From, Data}, State) ->
     {noreply, State};
 
 handle_cast({collect, VC, Data}, State) ->
-    case ets:update_element(State#state.store, VC, [{3, Data}, {4, true}]) of
+    CollectFun = fun(T) -> ets:update_element(T, VC, [{3, Data}, {4, true}]) end,
+    case CollectFun(State#state.store) of
         false ->
-            lists:any(fun(T) -> ets:update_element(T, VC, [{3, Data}, {4, true}]) end, State#state.saved);
+            lists:any(CollectFun, State#state.saved);
         _ ->
             []
     end,
     {noreply, State};
 
-handle_cast(mark, State = #state{store = S, saved = List}) ->
-    {noreply, State#state{store = ets:new(table, []), saved = [S | List]}}.
+handle_cast({mark, Ref}, State = #state{store = S, saved = List}) ->
+    {noreply, State#state{store = ets:new(table, []), saved = [{S, Ref} | List]}}.
 
 
 handle_info(check_store, State) ->
     case ets:info(State#state.store, size) of
         Size when Size >= ?STORE_LIMIT ->
-            lists:foreach(fun mark/1, [node() | nodes()]);
+            Ref = make_ref(),
+            lists:foreach(fun(N) -> mark(N, Ref) end, [node() | nodes()]),
+            ebalancer_collector:expect(Ref);
         _ ->
             []
     end,
