@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, expect/1, send_list/3]).
+-export([start_link/0, expect/2, collect_list/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -17,11 +17,11 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-expect(Ref) ->
-    gen_server:cast(?MODULE, {expect, Ref}).
+expect(Ref, Count) ->
+    gen_server:cast(?MODULE, {expect, Ref, Count}).
 
-send_list(Node, Ref, List) ->
-    gen_server:cast({?MODULE, Node}, {list, Ref, List}).
+collect_list(Node, Ref, List) ->
+    gen_server:cast({?MODULE, Node}, {collect, Ref, List}).
 
 %% -------------------------------------------------------------------
 %% gen_server callbacks
@@ -35,11 +35,10 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 
-handle_cast({expect, Ref}, State = #state{expected = E}) ->
-    Count = [node() | nodes()],
+handle_cast({expect, Ref, Count}, State = #state{expected = E}) ->
     {noreply, State#state{expected = [{Ref, Count, []}|E]}};
 
-handle_cast({list, Ref, List}, State = #state{expected = E}) ->
+handle_cast({collect, Ref, List}, State = #state{expected = E}) ->
     case lists:keyfind(Ref, 1, E) of
         {_, Count, L} when Count - 1 == 0 ->
             FinalList = [List|L],
