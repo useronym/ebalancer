@@ -22,12 +22,15 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+% Promise a single piece of data to the store server. Store will keep it inside an ETS table.
 promise(VC, From, Data) ->
     gen_server:cast(?MODULE, {promise, VC, From, Data}).
 
+% Collect a previously promised piece of data.
 collect(Node, VC, Data) ->
     gen_server:cast({?MODULE, Node}, {collect, VC, Data}).
 
+% Mark - save the current of the store and dispatch it to the 'FromNode' when it's ready.
 mark(Node, FromNode, Ref) ->
     gen_server:cast({?MODULE, Node}, {mark, FromNode, Ref}).
 
@@ -47,8 +50,7 @@ handle_call(_Request, _From, State) ->
 
 
 handle_cast({promise, VC, From, Data}, State) ->
-                                                % 'false' here means this object still has to be collected
-    ets:insert(State#state.store, {VC, From, Data, false}),
+    ets:insert(State#state.store, {VC, From, Data, false}), % 'false' denotes this object is still to be collected
     {noreply, State};
 
 handle_cast({collect, VC, Data}, State) ->
@@ -61,13 +63,14 @@ handle_cast({collect, VC, Data}, State) ->
     end,
     {noreply, State};
 
-handle_cast({mark, FromNode, Ref}, State = #state{store = Tab, saved = List}) ->
-    {noreply, State#state{store = ets:new(table, []), saved = [{Tab, FromNode, Ref} | List]}}.
+handle_cast({mark, FromNode, Ref}, State = #state{store = Tab, saved = Saved}) ->
+    {noreply, State#state{store = ets:new(table, []), saved = [{Tab, FromNode, Ref} | Saved]}}.
 
 
+% Check if the store limit has been reached, if yes, then create a snapshot across the whole system.
 handle_info(check_store_limit, State) ->
     case ets:info(State#state.store, size) of
-        Size when Size > ?STORE_LIMIT -> %% this is where we create a 'snapshot' of the whole system
+        Size when Size > ?STORE_LIMIT ->
             Nodes = [node() | nodes()],
             Ref = make_ref(),
             lists:foreach(fun(Node) -> mark(Node, node(), Ref) end, Nodes),
@@ -77,19 +80,20 @@ handle_info(check_store_limit, State) ->
     end,
     {noreply, State};
 
+% Check if any of the saved tables have been completely collected, if yes then dispatch & erase them.
 handle_info(check_store_collected, State = #state{saved = Saved}) ->
-    fun F([{Tab, From, Ref} | List]) ->
+    F = fun({Tab, From, Ref}, AccIn) ->
             case table_collected(Tab) of
-               true ->
-                   List = prepare_table(Tab),
-                   ebalancer_collector:collect_list(From, Ref, List),
-                   {noreply, State#state{saved = lists:keydelete(Ref, 3, Saved)}};
-               _ ->
-                   F(List)
-           end;
-        F([]) -> {noreply, State};
-    end,
-    F(Saved).
+                true ->
+                    List = prepare_table(Tab),
+                    ebalancer_collector:collect(From, Ref, List),
+                    AccIn;
+                _ ->
+                    [{Tab, From, Ref} | AccIn]
+            end
+        end,
+    NewSaved = lists:foldl(F, [], Saved),
+    {noreply, State#state{saved = NewSaved}}.
 
 
 terminate(_Reason, _State) ->
@@ -105,7 +109,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% -------------------------------------------------------------------
 
 table_collected(Tab) ->
-    ets:match(Tab, {'_', '_', '_', true}) == [].
+    ets:match(Tab, {'_', '_', '_', false}) == [].
 
 prepare_table(Tab) ->
     lists:map(fun({VC, From, Data, _}) -> {VC, From, Data} end, ets:tab2list(Tab)).
