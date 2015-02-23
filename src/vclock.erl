@@ -89,7 +89,7 @@ descends(Va, Vb) ->
         end.
 
 
-% @doc Return true if Va is less than or equal to Vb, else false
+% @doc Returns true if Va is less than or equal to Vb, else false
 -spec compare(Va :: vclock(), Vb :: vclock()) -> boolean().
 compare(Va, Vb) ->
     case descends(Vb, Va) of
@@ -100,7 +100,13 @@ compare(Va, Vb) ->
                 true ->
                     false;
                 false ->
-                    get_timestamp(Va) =< get_timestamp(Vb)
+                    case {get_oldest(Va) ,get_oldest(Vb)} of
+                        {{_, Ta}, {_, Tb}} when Ta < Tb ->
+                            true;
+                        {{_, Ta}, {_, Tb}} when Ta > Tb ->
+                            false;
+                        {{Na, _}, {Nb, _}} ->
+                            Na < Nb
             end
     end.
 
@@ -175,23 +181,23 @@ merge(V=[{Node1,{Ctr1,TS1}=CT1}=NCT1|VClock],
 -spec get_counter(Node :: vclock_node(), VClock :: vclock()) -> counter().
 get_counter(Node, VClock) ->
     case lists:keyfind(Node, 1, VClock) of
-	{_, {Ctr, _TS}} -> Ctr;
+	{_, {Ctr, _TS}} -> Ctr;y
 	false           -> 0
     end.
 
-% @doc Get the timestamp of the oldest value in a VClock.
--spec get_timestamp(VClock :: vclock()) -> timestamp().
-get_timestamp(VClock) ->
-    get_timestamp1({0, 0}, VClock).
+% @doc Get the timestamp and name of the most fresh value in a VClock.
+-spec get_oldest(VClock :: vclock()) -> {vclock_node(), timestamp()}.
+get_oldest(VClock) ->
+    get_oldest1({0, 0, ''}, VClock).
 
-get_timestamp1({_Node, Timestamp}, []) ->
-    Timestamp;
-get_timestamp1({LargestCount, Stamp}, [{_Node, {ThisCount, ThisStamp}} | Rest]) ->
+get_oldest1({_Count, Timestamp, Name}, []) ->
+    {Name, Timestamp};
+get_oldest1({LargestCount, Stamp, Name}, [{Node, {ThisCount, ThisStamp}} | Rest]) ->
     case ThisCount >= LargestCount of
         true ->
-            get_timestamp1({ThisCount, max(Stamp, ThisStamp)}, Rest);
+            get_oldest1({ThisCount, max(Stamp, ThisStamp), Node}, Rest);
         _ ->
-            get_timestamp1({LargestCount, Stamp}, Rest)
+            get_oldest1({LargestCount, Stamp, Name}, Rest)
     end.
 
 % @doc Get the timestamp value in a VClock set from Node.
