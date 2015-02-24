@@ -1,4 +1,4 @@
--module(ebalancer_balancer).
+-module(ebalancer_controller).
 
 -behaviour(gen_server).
 
@@ -43,7 +43,7 @@ handle_cast({send_tcp, From, Data}, State) ->
     ebalancer_store:promise(NewVC, From, Data),
     Balancers = [node() |nodes()],
     TargetNode = lists:nth(random:uniform(length(Balancers)), Balancers),
-    ebalancer_balancer:notify(TargetNode, NewVC),
+    ebalancer_controller:notify(TargetNode, NewVC),
     ebalancer_worker:process(node(), NewVC, Data),
     {noreply, State#state{vc = NewVC}};
 
