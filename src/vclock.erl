@@ -48,7 +48,7 @@
     all_nodes/1,
     equal/2,
     prune/3,
-    timestamp/0, increment/1, get_timestamp/1, compare/2]).
+    timestamp/0, increment/1, get_oldest/1, compare/2]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -107,6 +107,7 @@ compare(Va, Vb) ->
                             false;
                         {{Na, _}, {Nb, _}} ->
                             Na < Nb
+                    end
             end
     end.
 
@@ -181,7 +182,7 @@ merge(V=[{Node1,{Ctr1,TS1}=CT1}=NCT1|VClock],
 -spec get_counter(Node :: vclock_node(), VClock :: vclock()) -> counter().
 get_counter(Node, VClock) ->
     case lists:keyfind(Node, 1, VClock) of
-	{_, {Ctr, _TS}} -> Ctr;y
+	{_, {Ctr, _TS}} -> Ctr;
 	false           -> 0
     end.
 
