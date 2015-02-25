@@ -33,7 +33,7 @@ handle_call(_Request, _From, State) ->
 
 handle_cast({process, TargetNode, VC, Data}, State) ->
     Processed = dummy_function(Data),
-    ebalancer_store:collect(TargetNode, VC, Processed),
+    ebalancer_store:update(TargetNode, VC, Processed),
     {noreply, State}.
 
 handle_info(_Info, State) ->
