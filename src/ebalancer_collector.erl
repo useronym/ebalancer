@@ -20,8 +20,9 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-% Initiates the collection process.
-% The collector requests a snapshot of the system to be created, then collects and orders the pieces.
+%% Initiates the collection process.
+%% The collector requests a snapshot of the system to be created,
+%% then collects and orders the pieces.
 collect() ->
     gen_server:cast(?MODULE, collect).
 
@@ -38,24 +39,29 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 
-handle_cast(collect, State = #state{expected = E}) ->
+handle_cast(collect, State = #state{expected = Expected}) ->
     {Ref, Nodes} = ebalancer_controller:snapshot(),
-    timer:send_after(?COLLECT_AFTER, {collect, Ref, Nodes}),
-    {noreply, State#state{expected = [{Ref, Nodes} | E]}}.
+    timer:send_after(?COLLECT_AFTER, {collect, Ref}),
+    {noreply, State#state{expected = [{Ref, Nodes, []} | Expected]}}.
 
 
-handle_info({collect, Ref, Nodes}, State) ->
+handle_info({collect, Ref}, State = #state{expected = Expected}) ->
+    {_, Nodes, PreviouslyCollected} = lists:keyfind(Ref, 1, Expected),
     %% TODO: inefficient, investigate the rpc module
-    Replies = lists:map(fun(Node) -> {Node, ebalancer_store:collect(Node, Ref)} end, Nodes),
-    {Result, LateNodes} = lists:foldl(fun collect_fold_fun/2, {[], []}, Replies),
+    Replies = [{Node, ebalancer_store:collect(Node, Ref)} || Node <- Nodes],
+    {ListOfCollected, LateNodes} = lists:foldl(fun collect_fold_fun/2, {PreviouslyCollected, []}, Replies),
     case LateNodes of
         [] ->
-            Sorted = lists:sort(fun({VC1, _}, {VC2, _}) -> vclock:compare(VC1, VC2) end, lists:append(Result)),
+            %error_logger:info_report({"collector", "collected", Ref}),
+            Collected = lists:append(ListOfCollected),
+            Sorted = lists:sort(fun({VC1, _}, {VC2, _}) -> vclock:compare(VC1, VC2) end, Collected),
             dummy_save(Sorted),
-            {noreply, State#state{expected = lists:keydelete(Ref, 1, State#state.expected)}};
+            {noreply, State#state{expected = lists:keydelete(Ref, 1, Expected)}};
         _ ->
-            timer:send_after(?COLLECT_AFTER, {collect, Ref, LateNodes, Result}),
-            {noreply, State}
+            %error_logger:info_report({"collector", "nodes were late", {Ref, length(LateNodes)}}),
+            timer:send_after(?COLLECT_AFTER, {collect, Ref}),
+            NewExpected = lists:keyreplace(Ref, 1, Expected, {Ref, LateNodes, ListOfCollected}),
+            {noreply, State#state{expected = NewExpected}}
     end.
 
 
