@@ -1,4 +1,5 @@
 -module(ebalancer_store).
+-include_lib("stdlib/include/ms_transform.hrl").
 
 -behaviour(gen_server).
 
@@ -51,13 +52,14 @@ init([]) ->
 
 handle_call({collect, Ref}, _From, State = #state{saved = Saved}) ->
     case lists:keyfind(Ref, 1, Saved) of
-        {Tab, _} ->
+        {_, Tab} ->
             case table_collected(Tab) of
                 true ->
                     List = prepare_table(Tab),
                     ets:delete(Tab),
                     {reply, {ok, List}, State#state{saved = lists:keydelete(Ref, 1, Saved)}};
                 false ->
+                    %% TODO: have the messages re-sent to workers
                     {reply, notready, State}
             end;
         false ->
@@ -66,7 +68,7 @@ handle_call({collect, Ref}, _From, State = #state{saved = Saved}) ->
 
 
 handle_cast({store, VC, From, Data}, State) ->
-    ets:insert(State#state.store, {VC, false, From, Data}), % 'false' denotes this object is still to be collected
+    ets:insert(State#state.store, {VC, false, From, Data}),
     {noreply, State};
 
 handle_cast({update, VC, Data}, State) ->
@@ -95,12 +97,12 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-%% -------------------------------------------------------------------
-%% private functions
-%% -------------------------------------------------------------------
+%%%-----------------------------------------------------------------------------
+%%% private functions
+%%%-----------------------------------------------------------------------------
 
 table_collected(Tab) ->
-    ets:match(Tab, {'_', '_', '_', false}) == [].
+    0 == ets:select_count(Tab, ets:fun2ms(fun({_, Collected, _, _}) -> not Collected end)).
 
 prepare_table(Tab) ->
-    lists:map(fun({VC, _, From, Data}) -> {VC, {From, Data}} end, ets:tab2list(Tab)).
+    [{VC, {From, Data}} || {VC, _, From, Data} <- ets:tab2list(Tab)].
