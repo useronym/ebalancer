@@ -263,8 +263,9 @@ all_nodes(VClock) ->
 timestamp() ->
     %% Same as calendar:datetime_to_gregorian_seconds(erlang:universaltime()),
     %% but significantly faster.
-    {MegaSeconds, Seconds, MicroSeconds} = os:timestamp(),
-    ?SECONDS_FROM_GREGORIAN_BASE_TO_EPOCH + MegaSeconds*1000000000 + Seconds*1000 + MicroSeconds div 1000.
+    %{MegaSeconds, Seconds, MicroSeconds} = os:timestamp(),
+    %?SECONDS_FROM_GREGORIAN_BASE_TO_EPOCH + MegaSeconds*1000000000 + Seconds*1000 + MicroSeconds div 1000.
+    os:timestamp().
 
 % @doc Compares two VClocks for equality.
 -spec equal(VClockA :: vclock(), VClockB :: vclock()) -> boolean().

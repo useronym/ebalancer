@@ -10,8 +10,6 @@
 
 -record(state, {expected = []}).
 
--define(COLLECT_AFTER, 1000).
-
 
 %%%-----------------------------------------------------------------------------
 %%% API
@@ -21,10 +19,8 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %% Initiates the collection process.
-%% The collector requests a snapshot of the system to be created,
-%% then collects and orders the pieces.
 collect() ->
-    gen_server:cast(?MODULE, collect).
+    gen_server:call(?MODULE, collect).
 
 
 %%%-----------------------------------------------------------------------------
@@ -35,34 +31,35 @@ init([]) ->
     {ok, #state{}}.
 
 
-handle_call(_Request, _From, State) ->
+handle_call(collect, _From, State) ->
+    Nodes = [node() | nodes()],
+    VCs = [ebalancer_controller:get_vc(Node) || Node <- Nodes],
+    MaxVC = lists:last(lists:sort(fun vclock:compare/2, VCs)),
+    Data = lists:append([ebalancer_controller:get_msgs(Node) || Node <- Nodes]),
+    error_logger:info_report({"received", Data}),
+    Ordered = lists:sort(fun ({VC1, _, _}, {VC2, _, _}) -> vclock:compare(VC1, VC2) end, Data),
+    SplitFun = fun F([{VC, D, N} | Rest], Acc) ->
+        case VC == MaxVC of
+            false ->
+                F(Rest, [{VC, D, N} | Acc]);
+            true ->
+                [{VC, D, N} | Acc]
+        end;
+        F([], Acc) ->
+            Acc
+        end,
+    Safe = lists:reverse(SplitFun(Ordered, [])),
+    PrettySafe = lists:map(fun({VC, Payload, Node}) -> {Payload, Node, lists:sort(VC)} end, Safe),
+    error_logger:info_report({{"cutting off at", MaxVC}, PrettySafe}),
     {reply, ok, State}.
 
 
-handle_cast(collect, State = #state{expected = Expected}) ->
-    {Ref, Nodes} = ebalancer_controller:snapshot(),
-    timer:send_after(?COLLECT_AFTER, {collect, Ref}),
-    {noreply, State#state{expected = [{Ref, Nodes, []} | Expected]}}.
+handle_cast(_Request, State) ->
+    {reply, ok, State}.
 
 
-handle_info({collect, Ref}, State = #state{expected = Expected}) ->
-    {_, Nodes, PreviouslyCollected} = lists:keyfind(Ref, 1, Expected),
-    %% TODO: inefficient, investigate the rpc module
-    Replies = [{Node, ebalancer_store:collect(Node, Ref)} || Node <- Nodes],
-    {ListOfCollected, LateNodes} = lists:foldl(fun collect_fold_fun/2, {PreviouslyCollected, []}, Replies),
-    case LateNodes of
-        [] ->
-            %error_logger:info_report({"collector", "collected", Ref}),
-            Collected = lists:append(ListOfCollected),
-            Sorted = lists:sort(fun({VC1, _}, {VC2, _}) -> vclock:compare(VC1, VC2) end, Collected),
-            dummy_save(Sorted),
-            {noreply, State#state{expected = lists:keydelete(Ref, 1, Expected)}};
-        _ ->
-            %error_logger:info_report({"collector", "nodes were late", {Ref, length(LateNodes)}}),
-            timer:send_after(?COLLECT_AFTER, {collect, Ref}),
-            NewExpected = lists:keyreplace(Ref, 1, Expected, {Ref, LateNodes, ListOfCollected}),
-            {noreply, State#state{expected = NewExpected}}
-    end.
+handle_info(_Info, State) ->
+    {norepy, State}.
 
 
 terminate(_Reason, _State) ->
@@ -71,16 +68,3 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-
-%%%-----------------------------------------------------------------------------
-%%% private functions
-%%%-----------------------------------------------------------------------------
-
-collect_fold_fun({_Node, {ok, List}}, {Collected, NotReady}) ->
-    {[List | Collected], NotReady};
-collect_fold_fun({Node, notready}, {Collected, NotReady}) ->
-    {Collected, [Node | NotReady]}.
-
-dummy_save(List) ->
-    io:format("got a complete snaphost: ~p~n", [List]).
