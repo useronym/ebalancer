@@ -227,7 +227,7 @@ valid_dot(_) ->
 % @doc Increment VClock at current node.
 -spec increment(VClock :: vclock()) -> vclock().
 increment(VClock) ->
-    increment(self(), timestamp(), VClock).
+    increment(node(), timestamp(), VClock).
 
 % @doc Increment VClock at Node.
 -spec increment(Node :: vclock_node(), VClock :: vclock()) -> vclock().
