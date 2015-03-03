@@ -51,6 +51,7 @@ handle_call(collect, _From, State) ->
     Safe = lists:reverse(SplitFun(Ordered, [])),
     PrettySafe = lists:map(fun({VC, Payload, Node}) -> {Payload, Node, lists:sort(VC)} end, Safe),
     error_logger:info_report({{"cutting off at", MaxVC}, PrettySafe}),
+    lists:foreach(fun(Node) -> ebalancer_controller:erase_until(Node, MaxVC) end, Nodes),
     {reply, ok, State}.
 
 
