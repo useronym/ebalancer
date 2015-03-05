@@ -48,7 +48,13 @@
     all_nodes/1,
     equal/2,
     prune/3,
-    timestamp/0, increment/1, get_oldest/1, compare/2]).
+    timestamp/0,
+    increment/1,
+    get_oldest_node/1,
+    get_oldest_timestamp/1,
+    get_mean_timestamp/1,
+    compare/2,
+    compare/3]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -92,6 +98,9 @@ descends(Va, Vb) ->
 % @doc Returns true if Va is less than or equal to Vb, else false
 -spec compare(Va :: vclock(), Vb :: vclock()) -> boolean().
 compare(Va, Vb) ->
+    compare(Va, Vb, fun get_oldest_timestamp/1).
+
+compare(Va, Vb, StampComputeFun) ->
     case descends(Vb, Va) of
         true ->
             true;
@@ -100,16 +109,19 @@ compare(Va, Vb) ->
                 true ->
                     false;
                 false ->
-                    case {get_oldest(Va) ,get_oldest(Vb)} of
-                        {{_, Ta}, {_, Tb}} when Ta < Tb ->
+                    StampA = StampComputeFun(Va),
+                    StampB = StampComputeFun(Vb),
+                    case {StampA, StampB} of
+                        {A, B} when A < B ->
                             true;
-                        {{_, Ta}, {_, Tb}} when Ta > Tb ->
+                        {B, A} when A < B ->
                             false;
-                        {{Na, _}, {Nb, _}} ->
-                            Na < Nb
+                        _ ->
+                            get_oldest_node(Va) < get_oldest_node(Vb)
                     end
             end
     end.
+
 
 %% @doc does the given `vclock()' descend from the given `dot()'. The
 %% `dot()' can be any vclock entry returned from
@@ -186,20 +198,20 @@ get_counter(Node, VClock) ->
 	false           -> 0
     end.
 
-% @doc Get the timestamp and name of the most fresh value in a VClock.
--spec get_oldest(VClock :: vclock()) -> {vclock_node(), timestamp()}.
-get_oldest(VClock) ->
-    get_oldest1({0, 0, ''}, VClock).
-
-get_oldest1({_Count, Timestamp, Name}, []) ->
-    {Name, Timestamp};
-get_oldest1({LargestCount, Stamp, Name}, [{Node, {ThisCount, ThisStamp}} | Rest]) ->
-    case ThisCount >= LargestCount of
-        true ->
-            get_oldest1({ThisCount, max(Stamp, ThisStamp), Node}, Rest);
-        _ ->
-            get_oldest1({LargestCount, Stamp, Name}, Rest)
-    end.
+% @doc Get the name of the most fresh value in a VClock.
+-spec get_oldest_node(VClock :: vclock()) -> {vclock_node()}.
+get_oldest_node(VClock) ->
+    Pairs = ([{Node, get_counter(Node, VClock)} || Node <- all_nodes(VClock)]),
+    lists:foldl(fun({Node, Count}, {MaxNode, MaxCount}) ->
+        case Count > MaxCount of
+            true ->
+                {Node, Count};
+            _ ->
+                {MaxNode, MaxCount}
+        end
+        end,
+        {'', 0},
+        Pairs).
 
 % @doc Get the timestamp value in a VClock set from Node.
 -spec get_timestamp(Node :: vclock_node(), VClock :: vclock()) -> timestamp() | undefined.
@@ -208,6 +220,25 @@ get_timestamp(Node, VClock) ->
 	{_, {_Ctr, TS}} -> TS;
 	false           -> undefined
     end.
+
+% @doc Get the timestamp value in a VClock set from the oldest Node.
+-spec get_oldest_timestamp(VClock :: vclock()) -> timestamp().
+get_oldest_timestamp(VClock) ->
+    get_timestamp(get_oldest_node(VClock), VClock).
+
+%% @doc Get the mean timestamp of a vector clock.
+%% Expects the timestamps to be a 3-element tuple (e.g. returned by os:timestamp).
+-spec get_mean_timestamp(VClock :: vclock()) -> timestamp().
+get_mean_timestamp(VClock) ->
+    Stamps = [get_timestamp(Node, VClock) || Node <- all_nodes(VClock)],
+    Count = length(Stamps),
+    {MSum, SSum, USum} = lists:foldl(fun({MSecs, Secs, USecs}, {AccMS, AccS, AccUS}) ->
+        {AccMS+MSecs, AccS+Secs, AccUS+USecs}
+            end,
+        {0, 0, 0},
+        Stamps),
+    {MSum/Count, SSum/Count, USum/Count}.
+
 
 % @doc Get the entry `dot()' for `vclock_node()' from `vclock()'.
 -spec get_dot(Node :: vclock_node(), VClock :: vclock()) -> {ok, dot()} | undefined.
