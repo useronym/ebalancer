@@ -53,23 +53,25 @@ handle_call(get_msgs, _From, State) ->
 
 
 handle_cast({send_tcp, _From, Data}, State) ->
-    NewVC = vclock:increment(State#state.vc),
+    IncVC = vclock:increment(State#state.vc),
     Others = nodes(),
     TargetNode = lists:nth(random:uniform(length(Others)), Others),
-    ebalancer_controller:notify(TargetNode, NewVC),
-    {noreply, State#state{vc = NewVC, msgs = [{NewVC, Data, node()} | State#state.msgs]}};
+    ebalancer_controller:notify(TargetNode, IncVC),
+    {noreply, State#state{vc = IncVC, msgs = [{IncVC, Data} | State#state.msgs]}};
+
 
 handle_cast({notify, VC}, State) ->
-    NewVC = vclock:merge([VC, State#state.vc]),
+    NewVC = vclock:merge([VC, vclock:increment(State#state.vc)]),
     {noreply, State#state{vc = NewVC}};
 
 handle_cast({erase_until, VC}, State = #state{msgs = Msgs}) ->
-    NewMsgs = lists:dropwhile(fun({ThisVC, _, _}) -> vclock:compare(ThisVC, VC) end, Msgs),
+    NewMsgs = lists:dropwhile(fun({ThisVC, _}) -> vclock:compare(ThisVC, VC) end, Msgs),
     {noreply, State#state{msgs = NewMsgs}}.
 
 
-handle_info(_Info, State) ->
-    {noreply, State}.
+handle_info({notify, VC}, State) ->
+    NewVC = vclock:merge([VC, State#state.vc]),
+    {noreply, State#state{vc = NewVC}}.
 
 
 terminate(_Reason, _State) ->

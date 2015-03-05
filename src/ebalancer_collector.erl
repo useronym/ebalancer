@@ -36,21 +36,19 @@ handle_call(collect, _From, State) ->
     VCs = [ebalancer_controller:get_vc(Node) || Node <- Nodes],
     MaxVC = lists:last(lists:sort(fun vclock:compare/2, VCs)),
     Data = lists:append([ebalancer_controller:get_msgs(Node) || Node <- Nodes]),
-    error_logger:info_report({"received", Data}),
-    Ordered = lists:sort(fun ({VC1, _, _}, {VC2, _, _}) -> vclock:compare(VC1, VC2) end, Data),
-    SplitFun = fun F([{VC, D, N} | Rest], Acc) ->
+    Ordered = lists:sort(fun ({VC1, _}, {VC2, _}) -> vclock:compare(VC1, VC2, fun vclock:get_oldest_timestamp/1) end, Data),
+    SplitFun = fun F([{VC, Msg} | Rest], Acc) ->
         case VC == MaxVC of
             false ->
-                F(Rest, [{VC, D, N} | Acc]);
+                F(Rest, [{VC, Msg} | Acc]);
             true ->
-                [{VC, D, N} | Acc]
+                [{VC, Msg} | Acc]
         end;
         F([], Acc) ->
             Acc
         end,
     Safe = lists:reverse(SplitFun(Ordered, [])),
-    PrettySafe = lists:map(fun({VC, Payload, Node}) -> {Payload, Node, lists:sort(VC)} end, Safe),
-    error_logger:info_report({{"cutting off at", MaxVC}, PrettySafe}),
+    error_logger:info_report({stat:all(Safe)}),
     lists:foreach(fun(Node) -> ebalancer_controller:erase_until(Node, MaxVC) end, Nodes),
     {reply, ok, State}.
 
