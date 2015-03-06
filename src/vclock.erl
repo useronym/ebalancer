@@ -3,7 +3,6 @@
 %% riak_core: Core Riak Application
 %%
 %% Copyright (c) 2007-2010 Basho Technologies, Inc.  All Rights Reserved.
-%% Copyright (c) 2015 Adam 'entity', 'osense' Krupicka.  All Rights Reserved. Added compare/2 and improved timestamps.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -48,13 +47,7 @@
     all_nodes/1,
     equal/2,
     prune/3,
-    timestamp/0,
-    increment/1,
-    get_oldest_node/1,
-    get_oldest_timestamp/1,
-    get_mean_timestamp/1,
-    compare/2,
-    compare/3]).
+    timestamp/0]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -92,36 +85,7 @@ descends(Va, Vb) ->
             false;
         {_, {CtrA, _TSA}} ->
             (CtrA >= CtrB) andalso descends(Va,RestB)
-        end.
-
-
-% @doc Returns true if Va is less than or equal to Vb, else false
--spec compare(Va :: vclock(), Vb :: vclock()) -> boolean().
-compare(Va, Vb) ->
-    compare(Va, Vb, fun get_oldest_timestamp/1).
-
-compare(Va, Vb, StampComputeFun) ->
-    case descends(Vb, Va) of
-        true ->
-            true;
-        false ->
-            case descends(Va, Vb) of
-                true ->
-                    false;
-                false ->
-                    StampA = StampComputeFun(Va),
-                    StampB = StampComputeFun(Vb),
-                    case {StampA, StampB} of
-                        {A, B} when A < B ->
-                            true;
-                        {B, A} when A < B ->
-                            false;
-                        _ ->
-                            get_oldest_node(Va) < get_oldest_node(Vb)
-                    end
-            end
     end.
-
 
 %% @doc does the given `vclock()' descend from the given `dot()'. The
 %% `dot()' can be any vclock entry returned from
@@ -177,15 +141,15 @@ merge([], [], AccClock) -> lists:reverse(AccClock);
 merge([], Left, AccClock) -> lists:reverse(AccClock, Left);
 merge(Left, [], AccClock) -> lists:reverse(AccClock, Left);
 merge(V=[{Node1,{Ctr1,TS1}=CT1}=NCT1|VClock],
-      N=[{Node2,{Ctr2,TS2}=CT2}=NCT2|NClock], AccClock) ->
+    N=[{Node2,{Ctr2,TS2}=CT2}=NCT2|NClock], AccClock) ->
     if Node1 < Node2 ->
-            merge(VClock, N, [NCT1|AccClock]);
-       Node1 > Node2 ->
+        merge(VClock, N, [NCT1|AccClock]);
+        Node1 > Node2 ->
             merge(V, NClock, [NCT2|AccClock]);
-       true ->
+        true ->
             ({_Ctr,_TS} = CT) = if Ctr1 > Ctr2 -> CT1;
-                                   Ctr1 < Ctr2 -> CT2;
-                                   true        -> {Ctr1, erlang:max(TS1,TS2)}
+                                    Ctr1 < Ctr2 -> CT2;
+                                    true        -> {Ctr1, erlang:max(TS1,TS2)}
                                 end,
             merge(VClock, NClock, [{Node1,CT}|AccClock])
     end.
@@ -194,51 +158,17 @@ merge(V=[{Node1,{Ctr1,TS1}=CT1}=NCT1|VClock],
 -spec get_counter(Node :: vclock_node(), VClock :: vclock()) -> counter().
 get_counter(Node, VClock) ->
     case lists:keyfind(Node, 1, VClock) of
-	{_, {Ctr, _TS}} -> Ctr;
-	false           -> 0
+        {_, {Ctr, _TS}} -> Ctr;
+        false           -> 0
     end.
-
-% @doc Get the name of the most fresh value in a VClock.
--spec get_oldest_node(VClock :: vclock()) -> {vclock_node()}.
-get_oldest_node(VClock) ->
-    Pairs = ([{Node, get_counter(Node, VClock)} || Node <- all_nodes(VClock)]),
-    lists:foldl(fun({Node, Count}, {MaxNode, MaxCount}) ->
-        case Count > MaxCount of
-            true ->
-                {Node, Count};
-            _ ->
-                {MaxNode, MaxCount}
-        end
-        end,
-        {'', 0},
-        Pairs).
 
 % @doc Get the timestamp value in a VClock set from Node.
 -spec get_timestamp(Node :: vclock_node(), VClock :: vclock()) -> timestamp() | undefined.
 get_timestamp(Node, VClock) ->
     case lists:keyfind(Node, 1, VClock) of
-	{_, {_Ctr, TS}} -> TS;
-	false           -> undefined
+        {_, {_Ctr, TS}} -> TS;
+        false           -> undefined
     end.
-
-% @doc Get the timestamp value in a VClock set from the oldest Node.
--spec get_oldest_timestamp(VClock :: vclock()) -> timestamp().
-get_oldest_timestamp(VClock) ->
-    get_timestamp(get_oldest_node(VClock), VClock).
-
-%% @doc Get the mean timestamp of a vector clock.
-%% Expects the timestamps to be a 3-element tuple (e.g. returned by os:timestamp).
--spec get_mean_timestamp(VClock :: vclock()) -> timestamp().
-get_mean_timestamp(VClock) ->
-    Stamps = [get_timestamp(Node, VClock) || Node <- all_nodes(VClock)],
-    Count = length(Stamps),
-    {MSum, SSum, USum} = lists:foldl(fun({MSecs, Secs, USecs}, {AccMS, AccS, AccUS}) ->
-        {AccMS+MSecs, AccS+Secs, AccUS+USecs}
-            end,
-        {0, 0, 0},
-        Stamps),
-    {MSum/Count, SSum/Count, USum/Count}.
-
 
 % @doc Get the entry `dot()' for `vclock_node()' from `vclock()'.
 -spec get_dot(Node :: vclock_node(), VClock :: vclock()) -> {ok, dot()} | undefined.
@@ -255,11 +185,6 @@ valid_dot({_, {Cnt, TS}}) when is_integer(Cnt), is_integer(TS) ->
 valid_dot(_) ->
     false.
 
-% @doc Increment VClock at current node.
--spec increment(VClock :: vclock()) -> vclock().
-increment(VClock) ->
-    increment(node(), timestamp(), VClock).
-
 % @doc Increment VClock at Node.
 -spec increment(Node :: vclock_node(), VClock :: vclock()) -> vclock().
 increment(Node, VClock) ->
@@ -267,7 +192,7 @@ increment(Node, VClock) ->
 
 % @doc Increment VClock at Node.
 -spec increment(Node :: vclock_node(), IncTs :: timestamp(),
-                VClock :: vclock()) -> vclock().
+    VClock :: vclock()) -> vclock().
 increment(Node, IncTs, VClock) ->
     {{_Ctr, _TS}=C1,NewV} = case lists:keytake(Node, 1, VClock) of
                                 false ->
@@ -285,18 +210,17 @@ all_nodes(VClock) ->
 
 -define(DAYS_FROM_GREGORIAN_BASE_TO_EPOCH, (1970*365+478)).
 -define(SECONDS_FROM_GREGORIAN_BASE_TO_EPOCH,
-	(?DAYS_FROM_GREGORIAN_BASE_TO_EPOCH * 24*60*60*1000)
-	%% == calendar:datetime_to_gregorian_seconds({{1970,1,1},{0,0,0}}) * 1000
-       ).
+    (?DAYS_FROM_GREGORIAN_BASE_TO_EPOCH * 24*60*60)
+%% == calendar:datetime_to_gregorian_seconds({{1970,1,1},{0,0,0}})
+).
 
 % @doc Return a timestamp for a vector clock
 -spec timestamp() -> timestamp().
 timestamp() ->
     %% Same as calendar:datetime_to_gregorian_seconds(erlang:universaltime()),
     %% but significantly faster.
-    %{MegaSeconds, Seconds, MicroSeconds} = os:timestamp(),
-    %?SECONDS_FROM_GREGORIAN_BASE_TO_EPOCH + MegaSeconds*1000000000 + Seconds*1000 + MicroSeconds div 1000.
-    os:timestamp().
+    {MegaSeconds, Seconds, _} = os:timestamp(),
+    ?SECONDS_FROM_GREGORIAN_BASE_TO_EPOCH + MegaSeconds*1000000 + Seconds.
 
 % @doc Compares two VClocks for equality.
 -spec equal(VClockA :: vclock(), VClockB :: vclock()) -> boolean().
@@ -325,15 +249,155 @@ prune_vclock1(V,Now,BProps) ->
 prune_vclock1(V,Now,BProps,HeadTime) ->
     % has a precondition that V is longer than small and older than young
     case (length(V) > get_property(big_vclock,BProps)) orelse
-         ((Now - HeadTime) > get_property(old_vclock,BProps)) of
+        ((Now - HeadTime) > get_property(old_vclock,BProps)) of
         true -> prune_vclock1(tl(V),Now,BProps);
         false -> V
     end.
 
 get_property(Key, PairList) ->
     case lists:keyfind(Key, 1, PairList) of
-      {_Key, Value} ->
-        Value;
-      false ->
-        undefined
+        {_Key, Value} ->
+            Value;
+        false ->
+            undefined
     end.
+
+%% ===================================================================
+%% EUnit tests
+%% ===================================================================
+-ifdef(TEST).
+
+% doc Serves as both a trivial test and some example code.
+example_test() ->
+    A = vclock:fresh(),
+    B = vclock:fresh(),
+    A1 = vclock:increment(a, A),
+    B1 = vclock:increment(b, B),
+    true = vclock:descends(A1,A),
+    true = vclock:descends(B1,B),
+    false = vclock:descends(A1,B1),
+    A2 = vclock:increment(a, A1),
+    C = vclock:merge([A2, B1]),
+    C1 = vclock:increment(c, C),
+    true = vclock:descends(C1, A2),
+    true = vclock:descends(C1, B1),
+    false = vclock:descends(B1, C1),
+    false = vclock:descends(B1, A1),
+    ok.
+
+prune_small_test() ->
+    % vclock with less entries than small_vclock will be untouched
+    Now = riak_core_util:moment(),
+    OldTime = Now - 32000000,
+    SmallVC = [{<<"1">>, {1, OldTime}},
+        {<<"2">>, {2, OldTime}},
+        {<<"3">>, {3, OldTime}}],
+    Props = [{small_vclock,4}],
+    ?assertEqual(lists:sort(SmallVC), lists:sort(prune(SmallVC, Now, Props))).
+
+prune_young_test() ->
+    % vclock with all entries younger than young_vclock will be untouched
+    Now = riak_core_util:moment(),
+    NewTime = Now - 1,
+    VC = [{<<"1">>, {1, NewTime}},
+        {<<"2">>, {2, NewTime}},
+        {<<"3">>, {3, NewTime}}],
+    Props = [{small_vclock,1},{young_vclock,1000}],
+    ?assertEqual(lists:sort(VC), lists:sort(prune(VC, Now, Props))).
+
+prune_big_test() ->
+    % vclock not preserved by small or young will be pruned down to
+    % no larger than big_vclock entries
+    Now = riak_core_util:moment(),
+    NewTime = Now - 1000,
+    VC = [{<<"1">>, {1, NewTime}},
+        {<<"2">>, {2, NewTime}},
+        {<<"3">>, {3, NewTime}}],
+    Props = [{small_vclock,1},{young_vclock,1},
+        {big_vclock,2},{old_vclock,100000}],
+    ?assert(length(prune(VC, Now, Props)) =:= 2).
+
+prune_old_test() ->
+    % vclock not preserved by small or young will be pruned down to
+    % no larger than big_vclock and no entries more than old_vclock ago
+    Now = riak_core_util:moment(),
+    NewTime = Now - 1000,
+    OldTime = Now - 100000,
+    VC = [{<<"1">>, {1, NewTime}},
+        {<<"2">>, {2, OldTime}},
+        {<<"3">>, {3, OldTime}}],
+    Props = [{small_vclock,1},{young_vclock,1},
+        {big_vclock,2},{old_vclock,10000}],
+    ?assert(length(prune(VC, Now, Props)) =:= 1).
+
+prune_order_test() ->
+    % vclock with two nodes of the same timestamp will be pruned down
+    % to the same node
+    Now = riak_core_util:moment(),
+    OldTime = Now - 100000,
+    VC1 = [{<<"1">>, {1, OldTime}},
+        {<<"2">>, {2, OldTime}}],
+    VC2 = lists:reverse(VC1),
+    Props = [{small_vclock,1},{young_vclock,1},
+        {big_vclock,2},{old_vclock,10000}],
+    ?assertEqual(prune(VC1, Now, Props), prune(VC2, Now, Props)).
+
+accessor_test() ->
+    VC = [{<<"1">>, {1, 1}},
+        {<<"2">>, {2, 2}}],
+    ?assertEqual(1, get_counter(<<"1">>, VC)),
+    ?assertEqual(1, get_timestamp(<<"1">>, VC)),
+    ?assertEqual(2, get_counter(<<"2">>, VC)),
+    ?assertEqual(2, get_timestamp(<<"2">>, VC)),
+    ?assertEqual(0, get_counter(<<"3">>, VC)),
+    ?assertEqual(undefined, get_timestamp(<<"3">>, VC)),
+    ?assertEqual([<<"1">>, <<"2">>], all_nodes(VC)).
+
+merge_test() ->
+    VC1 = [{<<"1">>, {1, 1}},
+        {<<"2">>, {2, 2}},
+        {<<"4">>, {4, 4}}],
+    VC2 = [{<<"3">>, {3, 3}},
+        {<<"4">>, {3, 3}}],
+    ?assertEqual([], merge(vclock:fresh())),
+    ?assertEqual([{<<"1">>,{1,1}},{<<"2">>,{2,2}},{<<"3">>,{3,3}},{<<"4">>,{4,4}}],
+        merge([VC1, VC2])).
+
+merge_less_left_test() ->
+    VC1 = [{<<"5">>, {5, 5}}],
+    VC2 = [{<<"6">>, {6, 6}}, {<<"7">>, {7, 7}}],
+    ?assertEqual([{<<"5">>, {5, 5}},{<<"6">>, {6, 6}}, {<<"7">>, {7, 7}}],
+        vclock:merge([VC1, VC2])).
+
+merge_less_right_test() ->
+    VC1 = [{<<"6">>, {6, 6}}, {<<"7">>, {7, 7}}],
+    VC2 = [{<<"5">>, {5, 5}}],
+    ?assertEqual([{<<"5">>, {5, 5}},{<<"6">>, {6, 6}}, {<<"7">>, {7, 7}}],
+        vclock:merge([VC1, VC2])).
+
+merge_same_id_test() ->
+    VC1 = [{<<"1">>, {1, 2}},{<<"2">>,{1,4}}],
+    VC2 = [{<<"1">>, {1, 3}},{<<"3">>,{1,5}}],
+    ?assertEqual([{<<"1">>, {1, 3}},{<<"2">>,{1,4}},{<<"3">>,{1,5}}],
+        vclock:merge([VC1, VC2])).
+
+get_entry_test() ->
+    VC = vclock:fresh(),
+    VC1 = increment(a, increment(c, increment(b, increment(a, VC)))),
+    ?assertMatch({ok, {a, {2, _}}}, get_dot(a, VC1)),
+    ?assertMatch({ok, {b, {1, _}}}, get_dot(b, VC1)),
+    ?assertMatch({ok, {c, {1, _}}}, get_dot(c, VC1)),
+    ?assertEqual(undefined, get_dot(d, VC1)).
+
+valid_entry_test() ->
+    VC = vclock:fresh(),
+    VC1 = increment(c, increment(b, increment(a, VC))),
+    [begin
+         {ok, E} = get_dot(Actor, VC1),
+         ?assert(valid_dot(E))
+     end || Actor <- [a, b, c]],
+    ?assertNot(valid_dot(undefined)),
+    ?assertNot(valid_dot("huffle-puff")),
+    ?assertNot(valid_dot([])).
+
+-endif.
