@@ -47,7 +47,9 @@
     all_nodes/1,
     equal/2,
     prune/3,
-    timestamp/0]).
+    timestamp/0,
+    increment/1,
+    compare/2]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -262,10 +264,74 @@ get_property(Key, PairList) ->
             undefined
     end.
 
+
+%%
+%% Functions below implemented by Adam Krupicka. (c) 2015
+%%
+
+% @doc Increment VClock at current node.
+-spec increment(VClock :: vclock()) -> vclock().
+increment(VClock) ->
+    increment(node(), timestamp(), VClock).
+
+% @doc Get the name of the most fresh value in a VClock.
+-spec get_oldest_node(VClock :: vclock()) -> {vclock_node()}.
+get_oldest_node(VClock) ->
+    Pairs = ([{Node, get_counter(Node, VClock)} || Node <- all_nodes(VClock)]),
+    lists:foldl(fun({Node, Count}, {_, MaxCount}) when Count >= MaxCount ->
+                        {Node, Count};
+                   ({_, Count}, {MaxNode, MaxCount}) when Count < MaxCount ->
+                        {MaxNode, MaxCount}
+                end,
+                {'', 0},
+                Pairs).
+
+% @doc Get the timestamp value in a VClock set from the oldest Node.
+-spec get_oldest_timestamp(VClock :: vclock()) -> timestamp().
+get_oldest_timestamp(VClock) ->
+    get_timestamp(get_oldest_node(VClock), VClock).
+
+%% @doc Get the mean timestamp of a vector clock.
+%% Expects the timestamps to be a 3-element tuple (e.g. returned by os:timestamp).
+-spec get_mean_timestamp(VClock :: vclock()) -> timestamp().
+get_mean_timestamp(VClock) ->
+    Stamps = [get_timestamp(Node, VClock) || Node <- all_nodes(VClock)],
+    Count = length(Stamps),
+    {MSum, SSum, USum} = lists:foldl(fun({MSecs, Secs, USecs}, {AccMS, AccS, AccUS}) ->
+                                             {AccMS+MSecs, AccS+Secs, AccUS+USecs}
+                                     end,
+                                     {0, 0, 0},
+                                     Stamps),
+    {MSum/Count, SSum/Count, USum/Count}.
+
+% @doc Returns true if Va is less than or equal to Vb, else false
+compare(Va, Vb) ->
+    case descends(Vb, Va) of
+        true -> true;
+        false ->
+            case descends(Va, Vb) of
+                true -> false;
+                false ->
+                    Ta = get_mean_timestamp(Va),
+                    Tb = get_mean_timestamp(Vb),
+                    if Ta < Tb -> true;
+                       Ta > Tb -> false;
+                       Ta == Tb ->
+                           get_oldest_node(Va) < get_oldest_node(Vb)
+                    end
+            end
+    end.
+
+
+
 %% ===================================================================
 %% EUnit tests
 %% ===================================================================
 -ifdef(TEST).
+
+% To avoid an unnecessary dependency, we paste a function definition from riak_core_until.
+riak_core_until_moment() ->
+    calendar:datetime_to_gregorian_seconds(calendar:universal_time()).
 
 % doc Serves as both a trivial test and some example code.
 example_test() ->
@@ -287,7 +353,7 @@ example_test() ->
 
 prune_small_test() ->
     % vclock with less entries than small_vclock will be untouched
-    Now = riak_core_util:moment(),
+    Now = riak_core_until_moment(),
     OldTime = Now - 32000000,
     SmallVC = [{<<"1">>, {1, OldTime}},
         {<<"2">>, {2, OldTime}},
@@ -297,7 +363,7 @@ prune_small_test() ->
 
 prune_young_test() ->
     % vclock with all entries younger than young_vclock will be untouched
-    Now = riak_core_util:moment(),
+    Now = riak_core_until_moment(),
     NewTime = Now - 1,
     VC = [{<<"1">>, {1, NewTime}},
         {<<"2">>, {2, NewTime}},
@@ -308,7 +374,7 @@ prune_young_test() ->
 prune_big_test() ->
     % vclock not preserved by small or young will be pruned down to
     % no larger than big_vclock entries
-    Now = riak_core_util:moment(),
+    Now = riak_core_until_moment(),
     NewTime = Now - 1000,
     VC = [{<<"1">>, {1, NewTime}},
         {<<"2">>, {2, NewTime}},
@@ -320,7 +386,7 @@ prune_big_test() ->
 prune_old_test() ->
     % vclock not preserved by small or young will be pruned down to
     % no larger than big_vclock and no entries more than old_vclock ago
-    Now = riak_core_util:moment(),
+    Now = riak_core_until_moment(),
     NewTime = Now - 1000,
     OldTime = Now - 100000,
     VC = [{<<"1">>, {1, NewTime}},
@@ -333,7 +399,7 @@ prune_old_test() ->
 prune_order_test() ->
     % vclock with two nodes of the same timestamp will be pruned down
     % to the same node
-    Now = riak_core_util:moment(),
+    Now = riak_core_until_moment(),
     OldTime = Now - 100000,
     VC1 = [{<<"1">>, {1, OldTime}},
         {<<"2">>, {2, OldTime}}],
