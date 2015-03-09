@@ -36,7 +36,7 @@ handle_call(collect, _From, State) ->
     VCs = [ebalancer_controller:get_vc(Node) || Node <- Nodes],
     MaxVC = lists:last(lists:sort(fun vclock:compare/2, VCs)),
     Data = lists:append([ebalancer_controller:get_msgs(Node) || Node <- Nodes]),
-    Ordered = lists:sort(fun ({VC1, _}, {VC2, _}) -> vclock:compare(VC1, VC2, fun vclock:get_oldest_timestamp/1) end, Data),
+    Ordered = lists:sort(fun ({VC1, _}, {VC2, _}) -> vclock:compare(VC1, VC2) end, Data),
     SplitFun = fun F([{VC, Msg} | Rest], Acc) ->
         case VC == MaxVC of
             false ->
@@ -48,7 +48,7 @@ handle_call(collect, _From, State) ->
             Acc
         end,
     Safe = lists:reverse(SplitFun(Ordered, [])),
-    error_logger:info_report({stat:all(Safe)}),
+    stat:stat(Safe),
     lists:foreach(fun(Node) -> ebalancer_controller:erase_until(Node, MaxVC) end, Nodes),
     {reply, ok, State}.
 

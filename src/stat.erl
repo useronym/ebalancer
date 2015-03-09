@@ -1,33 +1,95 @@
 -module(stat).
 
-%% API
--export([all/1, clocks/1, accuracy/1, accuracy_strict/1]).
+-behaviour(gen_server).
 
-all(List) ->
-    VCs = [VC || {VC, _} <- List],
-    Msgs = [Msg || {_, Msg} <- List],
-    {{comparability, clocks(VCs)},
-        {accuracy, accuracy(Msgs)},
-        {accuracy_strict, accuracy_strict(Msgs)},
-        {average_jump, average_jump(Msgs)}}.
+%% API
+-export([start_link/0, stat/1, get_stats/0]).
+
+%% gen_server callbacks
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+
+%%%-----------------------------------------------------------------------------
+%%% API
+%%%-----------------------------------------------------------------------------
+
+start_link() ->
+    gen_server:start_link({global, ?MODULE}, ?MODULE, [], []).
+
+%% Adds another batch into the statistics. Takes a list of tuples, where the first
+%% element is ordered vector clocks and the second is ordered (global!) message IDs.
+stat(Zipped) ->
+    gen_server:cast({global, ?MODULE}, {stat, Zipped}).
+
+get_stats() ->
+    gen_server:call({global, ?MODULE}, get_stats).
+
+%%%-----------------------------------------------------------------------------
+%%% gen_server callbacks
+%%%-----------------------------------------------------------------------------
+
+init([]) ->
+    Map = #{comparability => 1,
+        accuracy => 1,
+        accuracy_strict => 1,
+        average_jump => 1},
+    {ok, maps:put(entries_count, 0, Map)}.
+
+
+handle_call(get_stats, _From, Map) ->
+    {reply, Map, Map}.
+
+
+handle_cast({stat, Zipped}, M) ->
+    {VCs, IDs} = lists:unzip(Zipped),
+    ThisCount = length(VCs),
+    TotalCount = maps:get(entries_count, M),
+    PrevComp = maps:get(comparability, M),
+    M1 = maps:update(comparability, weighted_avg(comparability(VCs), ThisCount, PrevComp, TotalCount), M),
+    PrevAcc = maps:get(accuracy, M),
+    M2 = maps:update(accuracy, weighted_avg(accuracy(IDs), ThisCount, PrevAcc, TotalCount), M1),
+    PrevAccS = maps:get(accuracy_strict, M),
+    M3 = maps:update(accuracy_strict, weighted_avg(accuracy_strict(IDs), ThisCount, PrevAccS, TotalCount), M2),
+    PrevJump = maps:get(average_jump, M),
+    M4 = maps:update(average_jump, weighted_avg(average_jump(IDs), ThisCount, PrevJump, TotalCount), M3),
+    {noreply, maps:update(entries_count, TotalCount + ThisCount, M4)}.
+
+
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+
+terminate(_Reason, _State) ->
+    ok.
+
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+%%%-----------------------------------------------------------------------------
+%%% internal functions
+%%%-----------------------------------------------------------------------------
+
+%% @doc Weighted average, where A has WeightA and B has WeightB.
+weighted_avg(A, WeightA, B, WeightB) ->
+    (A*WeightA + B*WeightB) / (WeightA + WeightB).
 
 
 %% @doc Takes an ordered list of ordered vclocks and computes how many
 %% can be ordered without tne need of comparing timestamps.
-clocks([]) ->
+comparability([]) ->
     undefined;
-clocks(VCs) ->
-    {Comp, NotComp, _} = lists:foldl(fun(VC, {Ok, Nok, PrevVC}) ->
+comparability(VCs) ->
+    {Comp, _} = lists:foldl(fun(VC, {Ok, PrevVC}) ->
         case vclock:descends(VC, PrevVC) of
             true ->
-                {Ok + 1, Nok, VC};
+                {Ok + 1, VC};
             false ->
-                {Ok, Nok + 1, VC}
+                {Ok, VC}
         end
     end,
-        {0, 0, vclock:fresh()},
+        {0, vclock:fresh()},
         VCs),
-    {{comparable, Comp}, {nope, NotComp}}.
+    Comp / length(VCs).
 
 
 %% @doc Takes a lists of ordered messages and computes how many are correctly ordered.
