@@ -6,7 +6,10 @@
 all(List) ->
     VCs = [VC || {VC, _} <- List],
     Msgs = [Msg || {_, Msg} <- List],
-    {clocks(VCs), accuracy(Msgs), accuracy_strict(Msgs)}.
+    {{comparability, clocks(VCs)},
+        {accuracy, accuracy(Msgs)},
+        {accuracy_strict, accuracy_strict(Msgs)},
+        {average_jump, average_jump(Msgs)}}.
 
 
 %% @doc Takes an ordered list of ordered vclocks and computes how many
@@ -28,7 +31,7 @@ clocks(VCs) ->
 
 
 %% @doc Takes a lists of ordered messages and computes how many are correctly ordered.
-%% The messages have to be integers.
+%% The messages have to be integers. The ideal value is 1.
 %% By a 'good' message is meant that the previous message has a lower ID
 accuracy([]) ->
     undefined;
@@ -43,11 +46,11 @@ accuracy(Msgs) ->
     end,
         {0, 0},
         Msgs),
-    {accuracy, TotalGood / length(Msgs)}.
+    TotalGood / length(Msgs).
 
 
 %% @doc Takes a lists of ordered messages and computes how many are correctly ordered.
-%% The messages have to be integers.
+%% The messages have to be integers. The ideal value is 1.
 %% By a 'good' message is meant that the previous message has ID of MyID - 1
 accuracy_strict([]) ->
     undefined;
@@ -62,4 +65,17 @@ accuracy_strict(Msgs) ->
     end,
         {0, 0},
         Msgs),
-    {accuracy_strict, TotalGood / length(Msgs)}.
+    TotalGood / length(Msgs).
+
+
+%% @doc Takes a list of ordered messages and computes the average "jump"
+%% between the messages (i.e. the average jump of 1.0 would be ideal).
+average_jump([]) ->
+    undefined;
+average_jump(Msgs) ->
+    {TotalJumps, _} = lists:foldl(fun(ID, {JumpAcc, PrevID}) ->
+        {JumpAcc + abs(ID - PrevID), ID}
+    end,
+        {0, 0},
+        Msgs),
+    TotalJumps / length(Msgs).
