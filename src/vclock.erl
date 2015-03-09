@@ -219,10 +219,7 @@ all_nodes(VClock) ->
 % @doc Return a timestamp for a vector clock
 -spec timestamp() -> timestamp().
 timestamp() ->
-    %% Same as calendar:datetime_to_gregorian_seconds(erlang:universaltime()),
-    %% but significantly faster.
-    {MegaSeconds, Seconds, _} = os:timestamp(),
-    ?SECONDS_FROM_GREGORIAN_BASE_TO_EPOCH + MegaSeconds*1000000 + Seconds.
+    os:timestamp().
 
 % @doc Compares two VClocks for equality.
 -spec equal(VClockA :: vclock(), VClockB :: vclock()) -> boolean().

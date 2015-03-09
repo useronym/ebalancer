@@ -2,5 +2,5 @@
 
 erl -pa ebin deps/evc/ebin \
     -boot start_sasl \
-    -name ebalancer`date +%S` \
+    -name ebalancer`date +%S`@localhost.localdomain \
     -s ebalancer_app start ebalancer
