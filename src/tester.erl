@@ -4,24 +4,18 @@
 -export([test_nodes/2, test/1]).
 
 
-%% Reads a file and distributed it to Nodes, breaking it on line ends.
-test_nodes(Filename, Nodes) ->
-    {ok, Binary} = file:read_file(Filename),
-    Lines = binary:split(Binary, <<$\n>>, [global]),
-    lists:foreach(fun(Line) ->
-        Target = lists:nth(random:uniform(length(Nodes)), Nodes),
-        gen_server:cast({ebalancer_controller, Target}, {send_tcp, test, Line})
-        end,
-    Lines).
+%% @doc A quick test that send 'Length' messages into the system, each stamped
+%% with an increasing global ID.
+test(Length) ->
+    test_nodes(Length, [node() | nodes()]).
 
-%% A quick test that send Length messages into the system.
-test(Length) when is_integer(Length) ->
-    test(1, Length + 1).
-test(N, N) ->
+%% Same as above, but takes Nodes to send messages to as an argument.
+test_nodes(Length, Nodes) when is_integer(Length) ->
+    test_nodes(1, Length + 1, Nodes).
+test_nodes(N, N, _Nodes) ->
     ok;
-test(N, Length) ->
-    Nodes = [node() | nodes()],
+test_nodes(N, Length, Nodes) ->
     Target = lists:nth(random:uniform(length(Nodes)), Nodes),
     gen_server:cast({ebalancer_controller, Target}, {send_tcp, test, N}),
     timer:sleep(1),
-    test(N + 1, Length).
+    test_nodes(N + 1, Length, Nodes).
