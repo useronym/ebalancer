@@ -39,7 +39,7 @@ handle_call(get_stats, _From, Map) ->
     {reply, Map, Map}.
 
 
-handle_cast({stat, Zipped}, M) ->
+handle_cast({stat, Zipped}, M) when length(Zipped) > 0 ->
     {VCs, IDs} = lists:unzip(Zipped),
     ThisCount = length(VCs),
     TotalCount = maps:get(entries_count, M),
@@ -51,7 +51,11 @@ handle_cast({stat, Zipped}, M) ->
     M3 = maps:update(accuracy_strict, weighted_avg(accuracy_strict(IDs), ThisCount, PrevAccS, TotalCount), M2),
     PrevJump = maps:get(average_jump, M),
     M4 = maps:update(average_jump, weighted_avg(average_jump(IDs), ThisCount, PrevJump, TotalCount), M3),
-    {noreply, maps:update(entries_count, TotalCount + ThisCount, M4)}.
+    {noreply, maps:update(entries_count, TotalCount + ThisCount, M4)};
+
+%% Ignore 0 length requests.
+handle_cast(_, Map) ->
+    {noreply, Map}.
 
 
 handle_info(_Info, State) ->
@@ -74,8 +78,8 @@ weighted_avg(A, WeightA, B, WeightB) ->
     (A*WeightA + B*WeightB) / (WeightA + WeightB).
 
 
-%% @doc Takes an ordered list of ordered vclocks and computes how many
-%% can be ordered without tne need of comparing timestamps.
+%% @doc Takes an ordered list of vclocks and computes how many
+%% can be/have been ordered without tne need of comparing timestamps.
 comparability([]) ->
     undefined;
 comparability(VCs) ->
@@ -92,7 +96,7 @@ comparability(VCs) ->
     Comp / length(VCs).
 
 
-%% @doc Takes a lists of ordered messages and computes how many are correctly ordered.
+%% @doc Takes a list of ordered messages and computes how many are correctly ordered.
 %% The messages have to be integers. The ideal value is 1.
 %% By a 'good' message is meant that the previous message has a lower ID
 accuracy([]) ->
@@ -111,7 +115,7 @@ accuracy(Msgs) ->
     TotalGood / length(Msgs).
 
 
-%% @doc Takes a lists of ordered messages and computes how many are correctly ordered.
+%% @doc Takes a list of ordered messages and computes how many are correctly ordered.
 %% The messages have to be integers. The ideal value is 1.
 %% By a 'good' message is meant that the previous message has ID of MyID - 1
 accuracy_strict([]) ->
@@ -135,9 +139,10 @@ accuracy_strict(Msgs) ->
 average_jump([]) ->
     undefined;
 average_jump(Msgs) ->
+    [FirstID | _] = Msgs,
     {TotalJumps, _} = lists:foldl(fun(ID, {JumpAcc, PrevID}) ->
         {JumpAcc + abs(ID - PrevID), ID}
     end,
-        {0, 0},
+        {0, FirstID - 1},
         Msgs),
     TotalJumps / length(Msgs).
