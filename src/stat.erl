@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, stat/1, get_stats/0]).
+-export([start/0, start_link/0, stat/1, get_stats/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -11,6 +11,9 @@
 %%%-----------------------------------------------------------------------------
 %%% API
 %%%-----------------------------------------------------------------------------
+
+start() ->
+    gen_server:start({global, ?MODULE}, ?MODULE, [], []).
 
 start_link() ->
     gen_server:start_link({global, ?MODULE}, ?MODULE, [], []).
