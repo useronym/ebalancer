@@ -34,7 +34,13 @@ init([]) ->
     Map = #{comparability => 1,
         accuracy => 1,
         accuracy_strict => 1,
-        average_jump => 1},
+        average_jump => 1,
+        %% average_batch_miss - On average, how many entries from batch n+1
+        %% should have been put before the last entry in batch n.
+        %% Ideal value would be 0, however anything higher than 'average_jump' means
+        %% the collection process is messing up the order more than it already is.
+        average_batch_miss => 0,
+        last_vclock => vclock:fresh()},
     {ok, maps:put(entries_count, 0, Map)}.
 
 
@@ -46,15 +52,24 @@ handle_cast({stat, Zipped}, M) when length(Zipped) > 0 ->
     {VCs, IDs} = lists:unzip(Zipped),
     ThisCount = length(VCs),
     TotalCount = maps:get(entries_count, M),
+
     PrevComp = maps:get(comparability, M),
     M1 = maps:update(comparability, weighted_avg(comparability(VCs), ThisCount, PrevComp, TotalCount), M),
+
     PrevAcc = maps:get(accuracy, M),
     M2 = maps:update(accuracy, weighted_avg(accuracy(IDs), ThisCount, PrevAcc, TotalCount), M1),
+
     PrevAccS = maps:get(accuracy_strict, M),
     M3 = maps:update(accuracy_strict, weighted_avg(accuracy_strict(IDs), ThisCount, PrevAccS, TotalCount), M2),
+
     PrevJump = maps:get(average_jump, M),
     M4 = maps:update(average_jump, weighted_avg(average_jump(IDs), ThisCount, PrevJump, TotalCount), M3),
-    {noreply, maps:update(entries_count, TotalCount + ThisCount, M4)};
+
+    PrevMiss = maps:get(average_batch_miss, M),
+    LastVclock = maps:get(last_vclock, M),
+    M5 = maps:update(average_batch_miss, weighted_avg(batch_miss(LastVclock, VCs), ThisCount, PrevMiss, TotalCount), M4),
+    M51 = maps:update(last_vclock, lists:last(VCs), M5),
+    {noreply, maps:update(entries_count, TotalCount + ThisCount, M51)};
 
 %% Ignore 0 length requests.
 handle_cast(_, Map) ->
@@ -149,3 +164,9 @@ average_jump(Msgs) ->
         {0, FirstID - 1},
         Msgs),
     TotalJumps / length(Msgs).
+
+
+%% @doc Computes how many Vclocks should have been ordered before the
+%% last vclock from previous batch.
+batch_miss(LastVclock, VCs) ->
+    length(lists:takewhile(fun(Vclock) -> vclock:compare(Vclock, LastVclock) end, VCs)).

@@ -20,7 +20,7 @@ test_nodes(N, Length, Nodes) ->
     test_nodes(N + 1, Length, Nodes).
 
 test_stream(MsgsPerSecond, Duration) ->
-    test_stream_nodes(MsgsPerSecond, Duration, [node | nodes()]).
+    test_stream_nodes(MsgsPerSecond, Duration, [node() | nodes()]).
 
 test_stream_nodes(_, Duration, _) when Duration =< 0 ->
     ok;
