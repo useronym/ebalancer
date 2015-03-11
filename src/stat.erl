@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start/0, start_link/0, stat/1, get_stats/0]).
+-export([start/0, start_link/0, stop/0, stat/1, get_stats/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -17,6 +17,9 @@ start() ->
 
 start_link() ->
     gen_server:start_link({global, ?MODULE}, ?MODULE, [], []).
+
+stop() ->
+    gen_server:call({global, ?MODULE}, stop).
 
 %% Adds another batch into the statistics. Takes a list of tuples, where the first
 %% element is ordered vector clocks and the second is ordered (global!) message IDs.
@@ -39,13 +42,15 @@ init([]) ->
         %% should have been put before the last entry in batch n.
         %% Ideal value would be 0, however anything higher than 'average_jump' means
         %% the collection process is messing up the order more than it already is.
-        average_batch_miss => 0,
-        last_vclock => vclock:fresh()},
+        average_batch_miss => 0},
     {ok, maps:put(entries_count, 0, Map)}.
 
 
 handle_call(get_stats, _From, Map) ->
-    {reply, Map, Map}.
+    {reply, Map, Map};
+
+handle_call(stop, _From, State) ->
+    {stop, normal, ok, State}.
 
 
 handle_cast({stat, Zipped}, M) when length(Zipped) > 0 ->
@@ -66,11 +71,11 @@ handle_cast({stat, Zipped}, M) when length(Zipped) > 0 ->
     M4 = maps:update(average_jump, weighted_avg(average_jump(IDs), ThisCount, PrevJump, TotalCount), M3),
 
     PrevMiss = maps:get(average_batch_miss, M),
-    LastVclock = maps:get(last_vclock, M),
-    M5 = maps:update(average_batch_miss, weighted_avg(batch_miss(LastVclock, VCs), ThisCount, PrevMiss, TotalCount), M4),
-    M51 = maps:update(last_vclock, lists:last(VCs), M5),
+    [DefaultLastID | _] = IDs,
+    LastID = maps:get(last_id, M, DefaultLastID),
+    M5 = maps:update(average_batch_miss, weighted_avg(batch_miss(LastID, IDs), ThisCount, PrevMiss, TotalCount), M4),
+    M51 = maps:put(last_id, lists:last(IDs), M5),
     {noreply, maps:update(entries_count, TotalCount + ThisCount, M51)};
-
 %% Ignore 0 length requests.
 handle_cast(_, Map) ->
     {noreply, Map}.
@@ -166,7 +171,7 @@ average_jump(Msgs) ->
     TotalJumps / length(Msgs).
 
 
-%% @doc Computes how many Vclocks should have been ordered before the
-%% last vclock from previous batch.
-batch_miss(LastVclock, VCs) ->
-    length(lists:takewhile(fun(Vclock) -> vclock:compare(Vclock, LastVclock) end, VCs)).
+%% @doc Computes how many entries should have been ordered before the
+%% last entry from previous batch.
+batch_miss(LastID, IDs) ->
+    length(lists:takewhile(fun(ThisID) -> ThisID < LastID end, IDs)).
