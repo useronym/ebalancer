@@ -36,12 +36,12 @@ test_stream_nodes1(MsgsPerSecond, Duration, Nodes, StartID) ->
     {_, Secs, MicroSecs} = os:timestamp(),
     test_nodes(MsgsPerSecond, Nodes, StartID),
     {_, SecsAfter, MicroSecsAfter} = os:timestamp(),
-    MillisElapsed = (SecsAfter - Secs)*1000 + (MicroSecsAfter - MicroSecs)/1000,
+    MillisElapsed = round((SecsAfter - Secs)*1000 + (MicroSecsAfter - MicroSecs)/1000),
     if MillisElapsed =< 1000 ->
         timer:sleep(1000 - MillisElapsed),
         test_stream_nodes1(MsgsPerSecond, Duration - 1, Nodes, StartID + MsgsPerSecond);
        MillisElapsed > 1000 ->
-        SecsElapsed = MillisElapsed/1000,
+        SecsElapsed = round(MillisElapsed/1000),
         io:format("Can't keep up! Sent ~p messages in ~p seconds", [MsgsPerSecond, SecsElapsed]),
         test_stream_nodes1(MsgsPerSecond, Duration - SecsElapsed, Nodes, StartID + MsgsPerSecond)
     end.
