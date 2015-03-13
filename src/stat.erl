@@ -24,7 +24,7 @@ stop() ->
 %% Adds another batch into the statistics. Takes a list of tuples, where the first
 %% element is ordered vector clocks and the second is ordered (global!) message IDs.
 stat(Zipped) ->
-    gen_server:cast({global, ?MODULE}, {stat, Zipped}).
+    gen_server:cast({global, ?MODULE}, {stat, Zipped, node()}).
 
 get_stats() ->
     gen_server:call({global, ?MODULE}, get_stats).
@@ -42,7 +42,8 @@ init([]) ->
         %% should have been put before the last entry in batch n.
         %% Ideal value would be 0, however anything higher than 'average_jump' means
         %% the collection process is messing up the order more than it already is.
-        average_batch_miss => 0},
+        average_batch_miss => 0,
+        collecting_nodes => #{}},
     {ok, maps:put(entries_count, 0, Map)}.
 
 
@@ -53,7 +54,7 @@ handle_call(stop, _From, State) ->
     {stop, normal, ok, State}.
 
 
-handle_cast({stat, Zipped}, M) when length(Zipped) > 0 ->
+handle_cast({stat, Zipped, FromNode}, M) when length(Zipped) > 0 ->
     {VCs, IDs} = lists:unzip(Zipped),
     ThisCount = length(VCs),
     TotalCount = maps:get(entries_count, M),
@@ -75,7 +76,11 @@ handle_cast({stat, Zipped}, M) when length(Zipped) > 0 ->
     LastID = maps:get(last_id, M, DefaultLastID),
     M5 = maps:update(average_batch_miss, weighted_avg(batch_miss(LastID, IDs), ThisCount, PrevMiss, TotalCount), M4),
     M51 = maps:put(last_id, lists:last(IDs), M5),
-    {noreply, maps:update(entries_count, TotalCount + ThisCount, M51)};
+
+    NodesMap = maps:get(collecting_nodes, M),
+    ThisNodeCount = maps:get(FromNode, NodesMap, 0) + 1,
+    M6 = maps:put(collecting_nodes, maps:put(FromNode, ThisNodeCount, NodesMap), M51),
+    {noreply, maps:update(entries_count, TotalCount + ThisCount, M6)};
 %% Ignore 0 length requests.
 handle_cast(_, Map) ->
     {noreply, Map}.
