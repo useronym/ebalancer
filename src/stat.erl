@@ -54,7 +54,10 @@ handle_call(stop, _From, State) ->
     {stop, normal, ok, State}.
 
 
-handle_cast({stat, Zipped, FromNode}, M) when length(Zipped) > 0 ->
+
+handle_cast({stat, [], _}, Map) ->
+    {noreply, Map};
+handle_cast({stat, Zipped, FromNode}, M) ->
     {VCs, IDs} = lists:unzip(Zipped),
     ThisCount = length(VCs),
     TotalCount = maps:get(entries_count, M),
@@ -77,13 +80,11 @@ handle_cast({stat, Zipped, FromNode}, M) when length(Zipped) > 0 ->
     M5 = maps:update(average_batch_miss, weighted_avg(batch_miss(LastID, IDs), ThisCount, PrevMiss, TotalCount), M4),
     M51 = maps:put(last_id, lists:last(IDs), M5),
 
+
     NodesMap = maps:get(collecting_nodes, M),
     ThisNodeCount = maps:get(FromNode, NodesMap, 0) + 1,
     M6 = maps:put(collecting_nodes, maps:put(FromNode, ThisNodeCount, NodesMap), M51),
-    {noreply, maps:update(entries_count, TotalCount + ThisCount, M6)};
-%% Ignore 0 length requests.
-handle_cast(_, Map) ->
-    {noreply, Map}.
+    {noreply, maps:update(entries_count, TotalCount + ThisCount, M6)}.
 
 
 handle_info(_Info, State) ->
