@@ -3,13 +3,14 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, send_tcp/2, notify/2, erase_until/2, get_vc/1, get_msgs/1]).
+-export([start_link/0, send_tcp/2, notify/2, get_vc/0, take_msgs/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {vc = vclock:fresh(),
-    msgs = []}).
+    msgs = [],
+    buffer = []}).
 
 
 %%%-----------------------------------------------------------------------------
@@ -27,15 +28,13 @@ send_tcp(From, Data) ->
 notify(Node, VC) ->
     gen_server:cast({?MODULE, Node}, {notify, VC}).
 
-%% Tell a node it's safe to erase all messages until a certain point.
-erase_until(Node, VC) ->
-    gen_server:cast({?MODULE, Node}, {erase_until, VC}).
+%% Get the latest VC on the current node.
+get_vc() ->
+    gen_server:call(?MODULE, get_vc).
 
-get_vc(Node) ->
-    gen_server:call({?MODULE, Node}, get_vc).
-
-get_msgs(Node) ->
-    gen_server:call({?MODULE, Node}, get_msgs).
+%% Take messages until a given VC on the current node.
+take_msgs(Until) ->
+    gen_server:call(?MODULE, {take_msgs, Until}).
 
 %%%-----------------------------------------------------------------------------
 %%% gen_server callbacks
@@ -48,8 +47,10 @@ init([]) ->
 handle_call(get_vc, _From, State) ->
     {reply, State#state.vc, State};
 
-handle_call(get_msgs, _From, State) ->
-    {reply, State#state.msgs, State}.
+handle_call({take_msgs, Until}, _From, State = #state{msgs = Msgs, buffer = Buffer}) ->
+    NewMsgs = lists:append(Msgs, lists:reverse(Buffer)),
+    {Taken, Left} = lists:splitwith(fun({VC, _}) -> vclock:compare(VC, Until) end, NewMsgs),
+    {reply, Taken, State#state{msgs = Left, buffer = []}}.
 
 
 handle_cast({send_tcp, _From, Data}, State) ->
@@ -62,11 +63,7 @@ handle_cast({send_tcp, _From, Data}, State) ->
 
 handle_cast({notify, VC}, State) ->
     NewVC = vclock:merge([VC, vclock:increment(State#state.vc)]),
-    {noreply, State#state{vc = NewVC}};
-
-handle_cast({erase_until, VC}, State = #state{msgs = Msgs}) ->
-    NewMsgs = lists:dropwhile(fun({ThisVC, _}) -> vclock:compare(ThisVC, VC) end, Msgs),
-    {noreply, State#state{msgs = NewMsgs}}.
+    {noreply, State#state{vc = NewVC}}.
 
 
 handle_info({notify, VC}, State) ->
