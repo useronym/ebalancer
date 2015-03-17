@@ -275,13 +275,15 @@ increment(VClock) ->
 -spec get_oldest_node(VClock :: vclock()) -> {vclock_node()}.
 get_oldest_node(VClock) ->
     Pairs = ([{Node, get_counter(Node, VClock)} || Node <- all_nodes(VClock)]),
-    lists:foldl(fun({Node, Count}, {_, MaxCount}) when Count >= MaxCount ->
-                        {Node, Count};
-                   ({_, Count}, {MaxNode, MaxCount}) when Count < MaxCount ->
-                        {MaxNode, MaxCount}
-                end,
-                {'', 0},
-                Pairs).
+    {Oldest, _} = lists:foldl(
+        fun({Node, Count}, {_, MaxCount}) when Count >= MaxCount ->
+                {Node, Count};
+            ({_, Count}, {MaxNode, MaxCount}) when Count < MaxCount ->
+                {MaxNode, MaxCount}
+        end,
+        {'', 0},
+        Pairs),
+    Oldest.
 
 % @doc Get the timestamp value in a VClock set from the oldest Node.
 -spec get_oldest_timestamp(VClock :: vclock()) -> timestamp().
