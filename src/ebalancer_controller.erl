@@ -53,12 +53,12 @@ handle_call({take_msgs, Until}, _From, State = #state{msgs = Msgs, buffer = Buff
     {reply, Taken, State#state{msgs = Left, buffer = []}}.
 
 
-handle_cast({send_tcp, _From, Data}, State) ->
+handle_cast({send_tcp, _From, Data}, State = #state{buffer = Buffer}) ->
     IncVC = vclock:increment(State#state.vc),
     Others = nodes(),
     TargetNode = lists:nth(random:uniform(length(Others)), Others),
     ebalancer_controller:notify(TargetNode, IncVC),
-    {noreply, State#state{vc = IncVC, msgs = [{IncVC, Data} | State#state.msgs]}};
+    {noreply, State#state{vc = IncVC, buffer = [{IncVC, Data} | Buffer]}};
 
 
 handle_cast({notify, VC}, State) ->
