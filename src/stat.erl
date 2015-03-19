@@ -34,7 +34,8 @@ get_stats() ->
 %%%-----------------------------------------------------------------------------
 
 init([]) ->
-    Map = #{comparability => 1,
+    Map = #{entries_count => 0,
+        comparability => 1,
         accuracy => 1,
         accuracy_strict => 1,
         average_jump => 1,
@@ -44,7 +45,7 @@ init([]) ->
         %% the collection process is messing up the order more than it already is.
         average_batch_miss => 0,
         collecting_nodes => #{}},
-    {ok, maps:put(entries_count, 0, Map)}.
+    {ok, Map}.
 
 
 handle_call(get_stats, _From, Map) ->
@@ -75,11 +76,9 @@ handle_cast({stat, Zipped, FromNode}, M) ->
     M4 = maps:update(average_jump, weighted_avg(average_jump(IDs), ThisCount, PrevJump, TotalCount), M3),
 
     PrevMiss = maps:get(average_batch_miss, M),
-    [DefaultLastID | _] = IDs,
-    LastID = maps:get(last_id, M, DefaultLastID),
+    LastID = maps:get(last_id, M, hd(IDs) - 1),
     M5 = maps:update(average_batch_miss, weighted_avg(batch_miss(LastID, IDs), ThisCount, PrevMiss, TotalCount), M4),
     M51 = maps:put(last_id, lists:last(IDs), M5),
-
 
     NodesMap = maps:get(collecting_nodes, M),
     ThisNodeCount = maps:get(FromNode, NodesMap, 0) + 1,
