@@ -59,6 +59,7 @@ handle_call(collect, _From, State) ->
     Data = lists:append(Replies),
     Ordered = lists:sort(fun ({VC1, _}, {VC2, _}) -> vclock:descends(VC2, VC1) end, Data),
     stat:stat(Ordered),
+    garbage_collect(),
     {reply, ok, State}.
 
 
@@ -79,7 +80,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 %%%-----------------------------------------------------------------------------
-%%% internal function
+%%% internal functions
 %%%-----------------------------------------------------------------------------
 
 %% @doc Returns a random element from a list.
