@@ -182,7 +182,7 @@ get_dot(Node, VClock) ->
 
 %% @doc is the given argument a valid dot, or entry?
 -spec valid_dot(dot()) -> boolean().
-valid_dot({_, {Cnt, TS}}) when is_integer(Cnt), is_integer(TS) ->
+valid_dot({_, {Cnt, TS}}) when is_integer(Cnt), is_tuple(TS) ->
     true;
 valid_dot(_) ->
     false.
