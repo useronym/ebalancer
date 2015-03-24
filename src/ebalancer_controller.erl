@@ -62,13 +62,12 @@ handle_cast({send_tcp, _From, Data}, State = #state{buffer = Buffer}) ->
 
 
 handle_cast({notify, VC}, State) ->
-    NewVC = vclock:merge([VC, vclock:increment(State#state.vc)]),
+    NewVC = vclock:merge2(VC, State#state.vc),
     {noreply, State#state{vc = NewVC}}.
 
 
-handle_info({notify, VC}, State) ->
-    NewVC = vclock:merge([VC, State#state.vc]),
-    {noreply, State#state{vc = NewVC}}.
+handle_info(_Info, State) ->
+    {noreply, State}.
 
 
 terminate(_Reason, _State) ->
