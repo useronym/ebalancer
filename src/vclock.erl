@@ -93,7 +93,7 @@ descends({Va, Ta}, {Vb, Tb}) ->
 %% not go there.)
 %%
 -spec dominates(vclock(), vclock()) -> boolean().
-dominates({A, _}, {B, _}) ->
+dominates(A, B) ->
     %% In a sane world if two vclocks descend each other they MUST be
     %% equal. In riak they can descend each other and have different
     %% timestamps(!) How? Deleted keys, re-written, then restored is
@@ -118,7 +118,7 @@ merge2({Va, {Ta1, Ta2, Ta3}}, {Vb, {Tb1, Tb2, Tb3}}) ->
 
 % @doc Combine all VClocks in the input list into their least possible
 %      common descendant.
--spec merge(VClocks :: [pure_dot()]) -> vclock().
+-spec merge(VClocks :: [[pure_dot()]]) -> [pure_dot()].
 merge([])             -> [];
 merge([SingleVclock]) -> SingleVclock;
 merge([First|Rest])   -> merge(Rest, lists:keysort(1, First)).

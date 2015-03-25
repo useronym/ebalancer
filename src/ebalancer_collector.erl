@@ -8,7 +8,7 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {expected = []}).
+-record(state, {}).
 
 %% How often the collection process should be run, in milliseconds.
 -define(COLLECT_EVERY, 500).
@@ -50,8 +50,7 @@ handle_call(collect, _From, State) ->
     Elapsed = timer:now_diff(now(), Started) div 1000,
     NextNode = random(OtherNodes),
     spawn(fun() ->
-                  ToSleep = max(0, ?COLLECT_EVERY - Elapsed),
-                  timer:sleep(ToSleep),
+                  timer:sleep(max(0, ?COLLECT_EVERY - Elapsed)),
                   ebalancer_collector:collect(NextNode)
           end),
 
@@ -64,11 +63,11 @@ handle_call(collect, _From, State) ->
 
 
 handle_cast(_Request, State) ->
-    {reply, ok, State}.
+    {noreply, State}.
 
 
 handle_info(_Info, State) ->
-    {norepy, State}.
+    {noreply, State}.
 
 
 terminate(_Reason, _State) ->

@@ -15,7 +15,7 @@
 %%%-----------------------------------------------------------------------------
 
 %% @doc Start a TCP echo server.
--spec start_link(atom(), integer()) -> ok.
+-spec start_link(atom(), integer()) -> {ok, pid()}.
 start_link(Name, Port) ->
     gen_tcp_server:start_link(Name, ?MODULE, Port, [{packet, line}]).
 
@@ -29,7 +29,7 @@ handle_accept(_Socket, Name) ->
 
 %% @private
 handle_tcp(_Socket, Data, State) ->
-    ebalancer_balancer:send_tcp(State#state.name, Data),
+    ebalancer_controller:send_tcp(State#state.name, Data),
     {ok, State}.
 
 %% @private
