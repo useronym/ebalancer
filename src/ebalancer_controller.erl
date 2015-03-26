@@ -3,14 +3,16 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, send_tcp/2, notify/2, get_vc/0, take_msgs/1]).
+-export([start_link/0, send_tcp/2, notify/2, get_all_vclocks/0, take_all_msgs/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {vc = vclock:fresh(),
+-record(state, {
+    vc = vclock:fresh(),
     msgs = [],
-    buffer = []}).
+    buffer = []
+}).
 
 
 %%%-----------------------------------------------------------------------------
@@ -20,21 +22,24 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-% Send raw TCP data into the system.
+%% Send raw TCP data into the system.
 send_tcp(From, Data) ->
     gen_server:cast(?MODULE, {send_tcp, From, Data}).
 
-% Notify controller on another node, forcing it to update it's vector clock.
+%% Notify controller on another node, forcing it to update it's vector clock.
 notify(Node, VC) ->
     gen_server:cast({?MODULE, Node}, {notify, VC}).
 
-%% Get the latest VC on the current node.
-get_vc() ->
-    gen_server:call(?MODULE, get_vc).
+%% Get the latest VCs on all nodes.
+get_all_vclocks() ->
+    {Replies, []} = gen_server:multi_call(?MODULE, get_vc),
+    [VC || {_Node, VC} <- Replies].
 
-%% Take messages until a given VC on the current node.
-take_msgs(Until) ->
-    gen_server:call(?MODULE, {take_msgs, Until}).
+%% Take messages until a given VC on all nodes.
+take_all_msgs(Until) ->
+    {Replies, []} = gen_server:multi_call(?MODULE, {take_msgs, Until}),
+    {_, ListsOfMsgs} = lists:unzip(Replies),
+    lists:append(ListsOfMsgs).
 
 %%%-----------------------------------------------------------------------------
 %%% gen_server callbacks
@@ -56,7 +61,7 @@ handle_call({take_msgs, Until}, _From, State = #state{msgs = Msgs, buffer = Buff
 handle_cast({send_tcp, _From, Data}, State = #state{buffer = Buffer}) ->
     IncVC = vclock:increment(State#state.vc),
     Others = nodes(),
-    TargetNode = lists:nth(random:uniform(length(Others)), Others),
+    TargetNode = random(Others),
     ebalancer_controller:notify(TargetNode, IncVC),
     {noreply, State#state{vc = IncVC, buffer = [{IncVC, Data} | Buffer]}};
 
@@ -76,3 +81,12 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+
+%%%-----------------------------------------------------------------------------
+%%% internal functions
+%%%-----------------------------------------------------------------------------
+
+%% @doc Returns a random element from a list.
+random(List) ->
+    lists:nth(random:uniform(length(List)), List).
