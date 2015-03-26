@@ -1,6 +1,6 @@
 #!/bin/bash
 
-erl -pa ebin deps/evc/ebin \
+erl -pa ebin \
     -boot start_sasl \
-    -name ebalancer`date +%S` \
-    -s ebalancer_app start ebalancer
+    -name ebalancer \
+    -s ebalancer_app
