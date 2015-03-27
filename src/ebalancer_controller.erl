@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, send_tcp/2, notify/2, get_all_vclocks/0, take_all_msgs/1]).
+-export([start_link/0, send_tcp/2, notify/2, get_all_vclocks/0, take_msgs/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -35,11 +35,9 @@ get_all_vclocks() ->
     {Replies, []} = gen_server:multi_call(?MODULE, get_vc),
     [VC || {_Node, VC} <- Replies].
 
-%% Take messages until a given VC on all nodes.
-take_all_msgs(Until) ->
-    {Replies, []} = gen_server:multi_call(?MODULE, {take_msgs, Until}),
-    {_, ListsOfMsgs} = lists:unzip(Replies),
-    lists:append(ListsOfMsgs).
+%% Take Count messages from the local node.
+take_msgs(Count) ->
+    gen_server:call(?MODULE, {take_msgs, Count}).
 
 %%%-----------------------------------------------------------------------------
 %%% gen_server callbacks
@@ -52,9 +50,9 @@ init([]) ->
 handle_call(get_vc, _From, State) ->
     {reply, State#state.vc, State};
 
-handle_call({take_msgs, Until}, _From, State = #state{msgs = Msgs, buffer = Buffer}) ->
-    NewMsgs = lists:append(Msgs, lists:reverse(Buffer)),
-    {Taken, Left} = lists:splitwith(fun({VC, _}) -> vclock:compare(VC, Until) end, NewMsgs),
+handle_call({take_msgs, Count}, _From, State) ->
+    NewMsgs = lists:append(State#state.msgs, lists:reverse(State#state.buffer)),
+    {Taken, Left} = lists:split(max(0, Count), NewMsgs),
     {reply, Taken, State#state{msgs = Left, buffer = []}}.
 
 
