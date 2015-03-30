@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, collect_all/0, set_next_node/2, open_socket/0, get_active_nodes/0]).
+-export([start_link/0, collect_all/0, set_next_node/1, open_socket/0, get_active_nodes/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -12,7 +12,6 @@
     active_node = false,
     socket,
     prev_pid,
-    vclock,
     next_collector_mon
 }).
 
@@ -29,9 +28,8 @@ collect_all() ->
     gen_server:abcast(?MODULE, collect).
 
 %% Sets the next node that should perform the collection process.
-%% The node also needs to know the last collection's vclock.
-set_next_node(Node, PrevVclock) ->
-    gen_server:call({?MODULE, Node}, {next_node, PrevVclock}).
+set_next_node(Node) ->
+    gen_server:call({?MODULE, Node}, next_node).
 
 %% Tell the collector on local node to open up it's output socket.
 open_socket() ->
@@ -52,8 +50,8 @@ init([]) ->
     {ok, #state{}}.
 
 
-handle_call({next_node, PrevVclock}, {PrevPid, _Tag}, State) ->
-    {reply, ok, State#state{active_node = true, prev_pid = PrevPid, vclock = PrevVclock}};
+handle_call(next_node, {PrevPid, _Tag}, State) ->
+    {reply, ok, State#state{active_node = true, prev_pid = PrevPid}};
 
 handle_call(is_active_node, _From, State) when State#state.active_node ->
     {reply, true, State};
@@ -62,17 +60,10 @@ handle_call(is_active_node, _From, State) when not State#state.active_node ->
 
 
 handle_cast(collect, State) when State#state.active_node ->
-    % First, we need the previous collection's clock.
-    PrevVC = State#state.vclock,
-    % And also the current clocks on all nodes.
     VCs = ebalancer_controller:get_all_vclocks(),
     MinVC = hd(lists:sort(fun vclock:compare/2, VCs)),
 
-    % Figure out how many messages we want from each node.
-    Counts = [{Node, vclock:get_counter(Node, MinVC) - vclock:get_counter(Node, PrevVC)}
-        || Node <- vclock:all_nodes(MinVC)],
-    % Make async calls to the nodes.
-    Keys = [rpc:async_call(Node, ebalancer_controller, take_msgs, [Count]) || {Node, Count} <- Counts],
+    Keys = [rpc:async_call(Node, ebalancer_controller, take_msgs, [MinVC]) || Node <- nodes()],
     % Collect the replies.
     Replies = [rpc:yield(Key) || Key <- Keys],
     Msgs = lists:append(Replies),
@@ -84,13 +75,13 @@ handle_cast(collect, State) when State#state.active_node ->
 
     % Set the next active node.
     NextNode = random(nodes()),
-    set_next_node(NextNode, MinVC),
+    set_next_node(NextNode),
     MonRef = monitor(process, {?MODULE, NextNode}),
 
     % Tell the previous node to stop monitoring us.
     State#state.prev_pid ! 'COLLECTION_OK',
 
-    {noreply, State#state{active_node = false, next_collector_mon = MonRef, vclock = MinVC}};
+    {noreply, State#state{active_node = false, next_collector_mon = MonRef}};
 handle_cast(collect, State) when not State#state.active_node ->
     {noreply, State};
 
@@ -109,7 +100,7 @@ handle_cast(open_socket, State) ->
 handle_info({'DOWN', _MonitorRef, _Type, _Object, _Info}, State) ->
     NewNextNode = random(nodes()),
     error_logger:warning_report({"Collecting node crashed, restarting on", NewNextNode}),
-    set_next_node(NewNextNode, State#state.vclock),
+    set_next_node(NewNextNode),
     MonRef = monitor(process, {?MODULE, NewNextNode}),
     {noreply, State#state{next_collector_mon = MonRef}};
 

@@ -36,8 +36,8 @@ get_all_vclocks() ->
     [VC || {_Node, VC} <- Replies].
 
 %% Take Count messages from the local node.
-take_msgs(Count) ->
-    gen_server:call(?MODULE, {take_msgs, Count}).
+take_msgs(MaxVC) ->
+    gen_server:call(?MODULE, {take_msgs, MaxVC}).
 
 %%%-----------------------------------------------------------------------------
 %%% gen_server callbacks
@@ -50,10 +50,17 @@ init([]) ->
 handle_call(get_vc, _From, State) ->
     {reply, State#state.vc, State};
 
-handle_call({take_msgs, Count}, _From, State) ->
+handle_call({take_msgs, MaxVC}, _From, State) ->
     NewMsgs = lists:append(State#state.msgs, lists:reverse(State#state.buffer)),
-    {Taken, Left} = lists:split(max(0, Count), NewMsgs),
-    {reply, Taken, State#state{msgs = Left, buffer = []}}.
+    case NewMsgs of
+        [] ->
+            {reply, [], State};
+        _ ->
+            {MinVC, _} = hd(NewMsgs),
+            Count = vclock:get_counter(node(), MaxVC) - vclock:get_counter(node(), MinVC),
+            {Taken, Left} = lists:split(max(0, Count), NewMsgs),
+            {reply, Taken, State#state{msgs = Left, buffer = []}}
+    end.
 
 
 handle_cast({send_tcp, _From, Data}, State = #state{buffer = Buffer}) ->
@@ -62,7 +69,6 @@ handle_cast({send_tcp, _From, Data}, State = #state{buffer = Buffer}) ->
     TargetNode = random(Others),
     ebalancer_controller:notify(TargetNode, IncVC),
     {noreply, State#state{vc = IncVC, buffer = [{IncVC, Data} | Buffer]}};
-
 
 handle_cast({notify, VC}, State) ->
     NewVC = vclock:merge2(VC, State#state.vc),
