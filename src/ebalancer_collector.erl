@@ -3,13 +3,14 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, collect_all/0, set_next_node/2, get_active_nodes/0]).
+-export([start_link/0, collect_all/0, set_next_node/2, open_socket/0, get_active_nodes/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {
     active_node = false,
+    socket,
     prev_pid,
     vclock,
     next_collector_mon
@@ -32,6 +33,10 @@ collect_all() ->
 set_next_node(Node, PrevVclock) ->
     gen_server:call({?MODULE, Node}, {next_node, PrevVclock}).
 
+%% Tell the collector on local node to open up it's output socket.
+open_socket() ->
+    gen_server:cast(?MODULE, open_socket).
+
 %% Returns a list of nodes that currently think they are collecting.
 get_active_nodes() ->
     {Replies, _} = gen_server:multi_call(?MODULE, is_active_node),
@@ -43,6 +48,7 @@ get_active_nodes() ->
 %%%-----------------------------------------------------------------------------
 
 init([]) ->
+    open_socket(),
     {ok, #state{}}.
 
 
@@ -73,7 +79,8 @@ handle_cast(collect, State) when State#state.active_node ->
 
     % We order and output the messages.
     Ordered = lists:sort(fun ({VC1, _}, {VC2, _}) -> vclock:compare(VC1, VC2) end, Msgs),
-    stat:stat(Ordered),
+    Data = [Payload || {_VC, Payload} <- Ordered],
+    ok = gen_tcp:send(State#state.socket, Data),
 
     % Set the next active node.
     NextNode = random(nodes()),
@@ -85,7 +92,18 @@ handle_cast(collect, State) when State#state.active_node ->
 
     {noreply, State#state{active_node = false, next_collector_mon = MonRef, vclock = MinVC}};
 handle_cast(collect, State) when not State#state.active_node ->
-    {noreply, State}.
+    {noreply, State};
+
+handle_cast(open_socket, State) ->
+    {ok, Host} = application:get_env(collector_out_host),
+    {ok, Port} = application:get_env(collector_out_port),
+    case gen_tcp:connect(Host, Port, [{mode, binary}, {send_timeout, 1000}], 1000) of
+        {ok, Socket} ->
+            {noreply, State#state{socket = Socket}};
+        Error ->
+            timer:sleep(1000),
+            {stop, Error, State}
+    end.
 
 
 handle_info({'DOWN', _MonitorRef, _Type, _Object, _Info}, State) ->

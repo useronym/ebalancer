@@ -3,10 +3,10 @@
   {description, ""},
   {vsn, "1"},
   {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib
-                 ]},
-  {mod, { ebalancer_app, []}},
-  {env, []}
+  {applications, [kernel, stdlib]},
+  {mod, {ebalancer_app, []}},
+  {env, [
+      {collector_out_host, "localhost"},
+      {collector_out_port, 5678}]
+  }
  ]}.

@@ -20,6 +20,7 @@ start() ->
 %%%-----------------------------------------------------------------------------
 
 start(_StartType, _StartArgs)->
+    ebalancer_tcp_line:start_link(node(), 5600),
     ebalancer_sup:start_link().
 
 stop(_State) ->
