@@ -28,8 +28,9 @@ collect_all() ->
     gen_server:abcast(?MODULE, collect).
 
 %% Sets the next node that should perform the collection process.
-set_next_node(Node, Vclock) ->
-    gen_server:call({?MODULE, Node}, {next_node, Vclock}).
+%% The node also needs to know the last collection's vclock.
+set_next_node(Node, PrevVclock) ->
+    gen_server:call({?MODULE, Node}, {next_node, PrevVclock}).
 
 %% Returns a list of nodes that currently think they are collecting.
 get_active_nodes() ->
@@ -46,11 +47,7 @@ init([]) ->
 
 
 handle_call({next_node, PrevVclock}, {PrevPid, _Tag}, State) ->
-    {reply, ok, State#state{
-        active_node = true,
-        prev_pid = PrevPid,
-        vclock = PrevVclock
-    }};
+    {reply, ok, State#state{active_node = true, prev_pid = PrevPid, vclock = PrevVclock}};
 
 handle_call(is_active_node, _From, State) when State#state.active_node ->
     {reply, true, State};
@@ -59,7 +56,7 @@ handle_call(is_active_node, _From, State) when not State#state.active_node ->
 
 
 handle_cast(collect, State) when State#state.active_node ->
-    % First, we need the previous collections clock.
+    % First, we need the previous collection's clock.
     PrevVC = State#state.vclock,
     % And also the current clocks on all nodes.
     VCs = ebalancer_controller:get_all_vclocks(),
@@ -67,18 +64,15 @@ handle_cast(collect, State) when State#state.active_node ->
 
     % Figure out how many messages we want from each node.
     Counts = [{Node, vclock:get_counter(Node, MinVC) - vclock:get_counter(Node, PrevVC)}
-              || Node <- vclock:all_nodes(MinVC)],
+        || Node <- vclock:all_nodes(MinVC)],
     % Make async calls to the nodes.
-    Keys = [rpc:async_call(Node, ebalancer_controller, take_msgs, [Count])
-            || {Node, Count} <- Counts],
+    Keys = [rpc:async_call(Node, ebalancer_controller, take_msgs, [Count]) || {Node, Count} <- Counts],
     % Collect the replies.
     Replies = [rpc:yield(Key) || Key <- Keys],
     Msgs = lists:append(Replies),
 
     % We order and output the messages.
-    Ordered = lists:sort(fun ({VC1, _}, {VC2, _}) ->
-        vclock:compare(VC1, VC2) end,
-        Msgs),
+    Ordered = lists:sort(fun ({VC1, _}, {VC2, _}) -> vclock:compare(VC1, VC2) end, Msgs),
     stat:stat(Ordered),
 
     % Set the next active node.
@@ -89,19 +83,14 @@ handle_cast(collect, State) when State#state.active_node ->
     % Tell the previous node to stop monitoring us.
     State#state.prev_pid ! 'COLLECTION_OK',
 
-    {noreply, State#state{
-        active_node = false,
-        next_collector_mon = MonRef,
-        vclock = MinVC
-    }};
+    {noreply, State#state{active_node = false, next_collector_mon = MonRef, vclock = MinVC}};
 handle_cast(collect, State) when not State#state.active_node ->
     {noreply, State}.
 
 
 handle_info({'DOWN', _MonitorRef, _Type, _Object, _Info}, State) ->
     NewNextNode = random(nodes()),
-    error_logger:warning_report({"Collecting node crashed, restarting on",
-        NewNextNode}),
+    error_logger:warning_report({"Collecting node crashed, restarting on", NewNextNode}),
     set_next_node(NewNextNode, State#state.vclock),
     MonRef = monitor(process, {?MODULE, NewNextNode}),
     {noreply, State#state{next_collector_mon = MonRef}};

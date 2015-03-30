@@ -45,15 +45,12 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 
+handle_cast({increase, Inc}, State = #state{count = Counter}) when Counter+Inc > ?MSG_LIMIT ->
+    ebalancer_collector:collect_all(),
+    ebalancer_timer:reset_all(),
+    {noreply, State#state{count = 0}};
 handle_cast({increase, Inc}, State = #state{count = Counter}) ->
-    NewCount = Counter + Inc,
-    if NewCount >= ?MSG_LIMIT ->
-        ebalancer_collector:collect_all(),
-        ebalancer_timer:reset_all(),
-        {noreply, State#state{count = 0}};
-       NewCount =< ?MSG_LIMIT ->
-        {noreply, State#state{count = NewCount}}
-    end;
+    {noreply, State#state{count = Counter + Inc}};
 
 handle_cast(reset, State) ->
     timer:cancel(State#state.timer_ref),
