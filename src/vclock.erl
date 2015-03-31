@@ -48,7 +48,8 @@
     prune/3,
     timestamp/0,
     increment/1,
-    compare/2
+    compare/2,
+    get_mean_timestamp/1
 ]).
 
 -ifdef(TEST).
