@@ -64,21 +64,18 @@ handle_cast(collect, State) when State#state.active_node ->
     MinVC = hd(lists:sort(fun vclock:compare/2, VCs)),
 
     Keys = [rpc:async_call(Node, ebalancer_controller, take_msgs, [MinVC]) || Node <- nodes()],
-    % Collect the replies.
     Replies = [rpc:yield(Key) || Key <- Keys],
     Msgs = lists:append(Replies),
 
-    % We order and output the messages.
-    Ordered = lists:sort(fun ({VC1, _}, {VC2, _}) -> vclock:compare(VC1, VC2) end, Msgs),
-    Data = [Payload || {_VC, Payload} <- Ordered],
+    Ordered = lists:sort(fun ({VC1, _, _}, {VC2, _, _}) -> vclock:compare(VC1, VC2) end, Msgs),
+    % Assumes Payload ends with \n
+    Data = [ Payload || {_VC, _From, Payload} <- Ordered],
     ok = gen_tcp:send(State#state.socket, Data),
 
-    % Set the next active node.
     NextNode = random(nodes()),
     set_next_node(NextNode),
     MonRef = monitor(process, {?MODULE, NextNode}),
 
-    % Tell the previous node to stop monitoring us.
     State#state.prev_pid ! 'COLLECTION_OK',
 
     {noreply, State#state{active_node = false, next_collector_mon = MonRef}};
