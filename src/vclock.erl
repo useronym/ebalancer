@@ -64,12 +64,12 @@
 % Nodes can have any term() as a name, but they must differ from each other.
 -type vclock_node() :: term().
 -type counter() :: integer().
--type timestamp() :: {integer(), integer(), integer()}.
+-type timestamp() :: integer().
 
 % @doc Create a brand new vclock.
 -spec fresh() -> vclock().
 fresh() ->
-    {[], {0, 0, 0}}.
+    {[], timestamp()}.
 
 % @doc Return true if Va is a direct descendant of Vb, else false -- remember, a vclock is its own descendant!
 -spec descends(Va :: vclock(), Vb :: vclock()) -> boolean().
@@ -109,13 +109,10 @@ dominates(A, B) ->
 -spec merge2(Va :: vclock(), Vb :: vclock()) -> vclock().
 merge2({[], A}, {[], _}) ->
     {[], A};
-merge2({Va, {Ta1, Ta2, Ta3}}, {Vb, {Tb1, Tb2, Tb3}}) ->
+merge2({Va, Ta}, {Vb, Tb}) ->
     Wa = length(Va),
     Wb = length(Vb),
-    W = Wa + Wb,
-    {merge([Va, Vb]), {(Ta1*Wa + Tb1*Wb) div W,
-        (Ta2*Wa + Tb2*Wb) div W,
-        (Ta3*Wa + Tb3*Wb) div W}}.
+    {merge([Va, Vb]), (Ta*Wa + Tb*Wb) div (Wa + Wb)}.
 
 % @doc Combine all VClocks in the input list into their least possible
 %      common descendant.
@@ -175,16 +172,15 @@ increment(Node, VClock) ->
 % @doc Increment VClock at Node.
 -spec increment(Node :: vclock_node(), IncTs :: timestamp(),
     VClock :: vclock()) -> vclock().
-increment(Node, IncTs, {VClock, Ts = {TsM, TsS, TsU}}) ->
+increment(Node, IncTs, {VClock, Ts}) ->
     {C1, NewV} = case lists:keytake(Node, 1, VClock) of
                      false ->
                          {1, VClock};
                      {value, {_N, C}, ModV} ->
                          {C + 1, ModV}
                  end,
-    {DM, DS, DU} = tdiff(IncTs, Ts),
     W = length(NewV) + 1,
-    NewTs = {TsM + DM div W, TsS + DS div W, TsU+ DU div W},
+    NewTs = Ts + ((IncTs - Ts) div W),
     {[{Node,C1}|NewV], NewTs}.
 
 
@@ -196,11 +192,8 @@ all_nodes({VClock, _}) ->
 % @doc Return a timestamp for a vector clock
 -spec timestamp() -> timestamp().
 timestamp() ->
-    os:timestamp().
-
--spec tdiff(timestamp(), timestamp()) -> timestamp().
-tdiff({Am, As, Au}, {Bm, Bs, Bu}) ->
-    {Am-Bm, As-Bs, Au-Bu}.
+    {MegaSecs, Secs, MicroSecs} = os:timestamp(),
+    MegaSecs*1000000000000 + Secs*1000000 + MicroSecs.
 
 % @doc Compares two VClocks for equality.
 -spec equal(VClockA :: vclock(), VClockB :: vclock()) -> boolean().
@@ -297,10 +290,10 @@ mean_timestamp_test() ->
     A1 = vclock:increment(a, A),
     timer:sleep(50),
     A2 = vclock:increment(b, A1),
-    T = now(),
+    T = timestamp(),
     timer:sleep(50),
     A3 = vclock:increment(c, A2),
-    ?assertMatch(X when abs(X) < 1000, timer:now_diff(get_mean_timestamp(A3), T)).
+    ?assertMatch(X when abs(X) < 1000, get_mean_timestamp(A3) - T).
 
 % To avoid an unnecessary dependency, we paste a function definition from riak_core_until.
 riak_core_until_moment() ->
@@ -391,13 +384,13 @@ accessor_test() ->
 
 merge2_test() ->
     VC1 = increment(1, increment(1, vclock:fresh())),
+    timer:sleep(20),
     VC2 = increment(2, vclock:fresh()),
-    {A1, B1, C1} = get_mean_timestamp(VC1),
-    {A2, B2, C2} = get_mean_timestamp(VC2),
-    ?assertEqual({[], {0, 0, 0}}, merge2(vclock:fresh(), vclock:fresh())),
-    ?assertEqual({[{1, 2}, {2, 1}],
-        {(A1+A2) div 2, (B1+B2) div 2, (C1+C2) div 2}},
-        merge2(VC1, VC2)).
+    Time = timestamp(),
+    ?assertMatch({[], T} when abs(T - Time) < 100, merge2(vclock:fresh(), vclock:fresh())),
+    T1 = get_mean_timestamp(VC1),
+    T2 = get_mean_timestamp(VC2),
+    ?assertEqual({[{1, 2}, {2, 1}], (T1 + T2) div 2}, merge2(VC1, VC2)).
 
 merge_less_left_test() ->
     VC1 = [{<<"5">>, {5, 5}}],
