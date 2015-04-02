@@ -107,8 +107,8 @@ dominates(A, B) ->
 
 % @doc Merge 2 VClocks, recalculating the mean timestamp.
 -spec merge2(Va :: vclock(), Vb :: vclock()) -> vclock().
-merge2({[], A}, {[], _}) ->
-    {[], A};
+merge2({[], Ta}, {[], Tb}) ->
+    {[], (Ta + Tb) div 2};
 merge2({Va, Ta}, {Vb, Tb}) ->
     Wa = length(Va),
     Wb = length(Vb),
@@ -383,11 +383,12 @@ accessor_test() ->
     ?assertEqual([<<"1">>, <<"2">>], all_nodes(VC)).
 
 merge2_test() ->
-    VC1 = increment(1, increment(1, vclock:fresh())),
-    timer:sleep(20),
-    VC2 = increment(2, vclock:fresh()),
     Time = timestamp(),
     ?assertMatch({[], T} when abs(T - Time) < 100, merge2(vclock:fresh(), vclock:fresh())),
+
+    VC1 = increment(1, increment(1, vclock:fresh())),
+    timer:sleep(100),
+    VC2 = increment(2, vclock:fresh()),
     T1 = get_mean_timestamp(VC1),
     T2 = get_mean_timestamp(VC2),
     ?assertEqual({[{1, 2}, {2, 1}], (T1 + T2) div 2}, merge2(VC1, VC2)).
