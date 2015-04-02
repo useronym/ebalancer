@@ -10,7 +10,8 @@
 
 -record(state, {
     vc = vclock:fresh(),
-    msgs = ets:new(msg_store, [])
+    msgs = [],
+    buffer = []
 }).
 
 
@@ -49,19 +50,24 @@ init([]) ->
 handle_call(get_vc, _From, State) ->
     {reply, State#state.vc, State};
 
-handle_call({take_msgs, MaxVC}, _From, State = #state{msgs = ETS}) ->
-    MaxId = vclock:get_counter(node(), MaxVC),
-    Taken = ets:select(ETS, [{{'$1','$2','$3', '$4'}, [{'=<', '$1', MaxId}], [{{'$2', '$3', '$4'}}]}]),
-    ets:select_delete(ETS, [{{'$1', '_', '_', '_'}, [{'=<', '$1', MaxId}], [true]}]),
-    {reply, Taken, State}.
+handle_call({take_msgs, MaxVC}, _From, State) ->
+    NewMsgs = lists:append(State#state.msgs, lists:reverse(State#state.buffer)),
+    case NewMsgs of
+        [] ->
+            {reply, [], State};
+        _ ->
+            {MinVC, _, _} = hd(NewMsgs),
+            Count = vclock:get_counter(node(), MaxVC) - vclock:get_counter(node(), MinVC),
+            {Taken, Left} = lists:split(max(0, Count), NewMsgs),
+            {reply, Taken, State#state{msgs = Left, buffer = []}}
+    end.
 
 
-handle_cast({send_tcp, From, Data}, State = #state{msgs = Msgs}) ->
+handle_cast({send_tcp, From, Data}, State = #state{buffer = Buffer}) ->
     IncVC = vclock:increment(State#state.vc),
-    ets:insert(Msgs, {vclock:get_counter(node(), IncVC), IncVC, From, Data}),
     TargetNode = random(nodes()),
     ebalancer_controller:notify(TargetNode, IncVC),
-    {noreply, State#state{vc = IncVC}};
+    {noreply, State#state{vc = IncVC, buffer = [{IncVC, From, Data} | Buffer]}};
 
 handle_cast({notify, VC}, State) ->
     NewVC = vclock:merge2(VC, State#state.vc),
