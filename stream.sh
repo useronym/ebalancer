@@ -24,5 +24,5 @@ len=${#hosts[@]}
 while read line
 do
 	printf >&"${fds[i]}" '%s\n' "$line"
-	i=$(( (i+1) % $len ))
+	(( i=(i+1)%$len ))
 done
