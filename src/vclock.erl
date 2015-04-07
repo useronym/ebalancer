@@ -110,9 +110,7 @@ dominates(A, B) ->
 merge2({[], Ta}, {[], Tb}) ->
     {[], (Ta + Tb) div 2};
 merge2({Va, Ta}, {Vb, Tb}) ->
-    Wa = length(Va),
-    Wb = length(Vb),
-    {merge([Va, Vb]), (Ta*Wa + Tb*Wb) div (Wa + Wb)}.
+    {merge([Va, Vb]), (Ta + Tb) div 2}.
 
 % @doc Combine all VClocks in the input list into their least possible
 %      common descendant.
