@@ -64,13 +64,14 @@ handle_cast(collect, State) when State#state.active_node ->
     MinVC = hd(lists:sort(fun vclock:compare/2, VCs)),
 
     AllNodes = [node() | nodes()],
-    Keys = [rpc:async_call(Node, ebalancer_controller, take_msgs, [MinVC]) || Node <- AllNodes],
+    TargetVC = lists:foldl(fun vclock:increment/2, MinVC, AllNodes),
+    Keys = [rpc:async_call(Node, ebalancer_controller, take_msgs, [TargetVC]) || Node <- AllNodes],
     Replies = [rpc:yield(Key) || Key <- Keys],
     Msgs = lists:append(Replies),
 
     Ordered = lists:sort(fun ({VC1, _, _}, {VC2, _, _}) -> vclock:compare(VC1, VC2) end, Msgs),
     % Assumes Payload ends with \n
-    Data = [ Payload || {_VC, _From, Payload} <- Ordered],
+    Data = [Payload || {_VC, _From, Payload} <- Ordered],
     ok = gen_tcp:send(State#state.socket, Data),
 
     NextNode = random(nodes()),
