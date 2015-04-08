@@ -10,10 +10,13 @@
 
 -record(state, {
     vc = vclock:fresh(),
+    msg_count = 0,
     msgs = [],
     buffer = []
 }).
 
+%% When this limit is reached, the controller will request a collection process.
+-define(MSG_LIMIT, 5000).
 
 %%%-----------------------------------------------------------------------------
 %%% API functions
@@ -63,11 +66,15 @@ handle_call({take_msgs, MaxVC}, _From, State) ->
     end.
 
 
-handle_cast({send_tcp, From, Data}, State = #state{buffer = Buffer}) ->
+handle_cast({send_tcp, From, Data}, State = #state{buffer = Buffer, msg_count = MCount}) ->
     IncVC = vclock:increment(State#state.vc),
-    TargetNode = random(nodes()),
-    ebalancer_controller:notify(TargetNode, IncVC),
-    {noreply, State#state{vc = IncVC, buffer = [{IncVC, From, Data} | Buffer]}};
+    ebalancer_controller:notify(random(nodes()), IncVC),
+    if MCount+1 > ?MSG_LIMIT ->
+        ebalancer_timer:request_collection(),
+        {noreply, State#state{vc = IncVC, buffer = [{IncVC, From, Data} | Buffer], msg_count = 0}};
+       true ->
+        {noreply, State#state{vc = IncVC, buffer = [{IncVC, From, Data} | Buffer], msg_count = MCount+1}}
+    end;
 
 handle_cast({notify, VC}, State) ->
     NewVC = vclock:merge2(VC, State#state.vc),
