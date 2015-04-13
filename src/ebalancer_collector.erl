@@ -53,10 +53,8 @@ init([]) ->
 handle_call(next_node, {PrevPid, _Tag}, State) ->
     {reply, ok, State#state{active_node = true, prev_pid = PrevPid}};
 
-handle_call(is_active_node, _From, State) when State#state.active_node ->
-    {reply, true, State};
-handle_call(is_active_node, _From, State) when not State#state.active_node ->
-    {reply, false, State}.
+handle_call(is_active_node, _From, State) ->
+    {reply, State#state.active_node, State}.
 
 
 handle_cast(collect, State) when State#state.active_node ->
