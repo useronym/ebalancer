@@ -5,10 +5,10 @@
 ## It might even make sense to use the same node as source and target to avoid this completely
 
 # Configuration variables.
-source=l4
+source=l5
 target=l5
 target_port=5678
-cluster=(virtual-228 virtual-229 virtual-230)
+cluster=(virtual-228 virtual-229 virtual-230 virtual-231)
 cluster_port=5600
 
 local_tmpfile=/tmp/ebalancer_streamdata
@@ -31,7 +31,7 @@ go ()
         echo "done"
     fi
 
-    ssh $target "$(typeset -f); await $(( $len * $cluster_len - $cluster_len)) $target_outfile" >$local_tmpfile &
+    ssh $target "$(typeset -f); await $(( $len * $cluster_len - $cluster_len*10)) $target_outfile" >$local_tmpfile &
     waitpid=$!
 
     # 16:17 < osse> entity: that's not how declare -p is meant to be used
@@ -43,7 +43,10 @@ go ()
     end_time=$(cat $local_tmpfile)
     if [[ $end_time =~ [0-9]+$ ]]; then # See if we got a number back
         diff_time=$(( $end_time - $start_time ))
-        echo "streamed $(( $len*$cluster_len )) messages in $(awk "BEGIN {printf \"%.2f\", $diff_time/1000}") seconds"
+        messages=$(( $len*$cluster_len ))
+        elapsed=$(awk "BEGIN {printf \"%.2f\", $diff_time/1000}")
+        speed=$(awk "BEGIN {printf \"%.2f\", $messages/$elapsed}")
+        echo "streamed $messages messages in ${elapsed}s ~ $speed/s"
     else
         echo "target node says: $end_time"
     fi
@@ -98,7 +101,7 @@ await_stop ()
 await ()
 {
     echo -n "" >$2 # Reset the message output file
-    max_time=$(( $(date +%s%3N) + $1/10 ))
+    max_time=$(( $(date +%s%3N) + $1/30 ))
     while true; do
         read len _ <<< $(wc -l $2)
         if [ $len -ge $1 ]; then
