@@ -105,7 +105,7 @@ handle_info({'DOWN', _MonitorRef, _Type, _Object, _Info}, State) ->
 
 handle_info('COLLECTION_OK', State) ->
     demonitor(State#state.next_collector_mon),
-    {noreply, State#state{next_collector_mon = undefined}}.
+    {noreply, State}.
 
 
 terminate(_Reason, _State) ->
