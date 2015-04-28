@@ -59,10 +59,10 @@ handle_call(is_active_node, _From, State) ->
 
 handle_cast(collect, State) when State#state.active_node ->
     VCs = ebalancer_controller:get_all_vclocks(),
-    MinVC = hd(lists:sort(fun vclock:compare/2, VCs)),
+    MinVC = hd(lists:sort(fun evc:compare/2, VCs)),
 
     AllNodes = [node() | nodes()],
-    TargetVC = lists:foldl(fun vclock:increment/2, MinVC, AllNodes),
+    TargetVC = lists:foldl(fun evc:increment/2, MinVC, AllNodes),
     Keys = [rpc:async_call(Node, ebalancer_controller, take_msgs, [TargetVC]) || Node <- AllNodes],
     Replies = [rpc:yield(Key) || Key <- Keys],
     Msgs = lists:append(Replies),
