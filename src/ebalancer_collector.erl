@@ -67,7 +67,7 @@ handle_cast(collect, State) when State#state.active_node ->
     Replies = [rpc:yield(Key) || Key <- Keys],
     Msgs = lists:append(Replies),
 
-    Ordered = lists:sort(fun ({VC1, _, _}, {VC2, _, _}) -> vclock:compare(VC1, VC2) end, Msgs),
+    Ordered = lists:sort(fun ({VC1, _, _}, {VC2, _, _}) -> evc:compare(VC1, VC2) end, Msgs),
     % Assumes Payload ends with \n
     Data = [Payload || {_VC, _From, Payload} <- Ordered],
     ok = gen_tcp:send(State#state.socket, Data),

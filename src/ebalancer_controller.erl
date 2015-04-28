@@ -9,7 +9,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {
-    vc = vclock:fresh(),
+    vc =
     msg_count = 0,
     msgs = [],
     buffer = []
@@ -47,7 +47,9 @@ take_msgs(MaxVC) ->
 %%%-----------------------------------------------------------------------------
 
 init([]) ->
-    {ok, #state{}}.
+    {ok, NodeId} = application:get_env(node_index),
+    Vclock = evc:new(NodeId),
+    {ok, #state{vc = Vclock}}.
 
 
 handle_call(get_vc, _From, State) ->
@@ -60,24 +62,19 @@ handle_call({take_msgs, MaxVC}, _From, State) ->
             {reply, [], State};
         _ ->
             {MinVC, _, _} = hd(NewMsgs),
-            Count = vclock:get_counter(node(), MaxVC) - vclock:get_counter(node(), MinVC),
+            Count = evc:counter(MaxVC) - evc:counter(MinVC),
             {Taken, Left} = lists:split(max(0, Count), NewMsgs),
             {reply, Taken, State#state{msgs = Left, buffer = []}}
     end.
 
 
-handle_cast({send_tcp, From, Data}, State = #state{buffer = Buffer, msg_count = MCount}) ->
-    IncVC = vclock:increment(State#state.vc),
+handle_cast({send_tcp, From, Data}, State = #state{buffer = Buffer}) ->
+    IncVC = evc:increment(State#state.vc),
     ebalancer_controller:notify(random(nodes()), IncVC),
-    if MCount+1 > ?MSG_LIMIT ->
-        ebalancer_timer:request_collection(),
-        {noreply, State#state{vc = IncVC, buffer = [{IncVC, From, Data} | Buffer], msg_count = 0}};
-       true ->
-        {noreply, State#state{vc = IncVC, buffer = [{IncVC, From, Data} | Buffer], msg_count = MCount+1}}
-    end;
+    {noreply, State#state{vc = IncVC, buffer = [{IncVC, From, Data} | Buffer]}};
 
 handle_cast({notify, VC}, State) ->
-    NewVC = vclock:merge2(VC, State#state.vc),
+    NewVC = evc:merge(State#state.vc, VC),
     {noreply, State#state{vc = NewVC}}.
 
 
