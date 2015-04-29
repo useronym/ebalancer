@@ -16,7 +16,7 @@
 -define(DEFAULT_SIZE, 4).
 
 %% API
--export([perf1/0, new/1, increment/1, counter/1, merge/2, compare/2, descends/2]).
+-export([perf1/0, new/1, increment/1, node_id/1, counter/1, counter/2, merge/2, compare/2, descends/2]).
 
 -type timestamp() :: integer().
 -type evc() :: {list(), timestamp(), integer()}.
@@ -37,10 +37,15 @@ increment(NodeTime, {VCList, TA, NodeId}) ->
 	TimeShift = NodeTime - LastNodeTime,
 	{set_nth(NodeId, {Counter + 1, NodeTime}, VCList), TA + TimeShift, NodeId}.
 
+-spec node_id(evc()) -> integer().
+node_id({_, _, NodeId}) ->
+    NodeId.
+
 -spec counter(evc()) -> integer().
 counter(VC = {_, _, NodeId}) ->
 	counter(NodeId, VC).
 
+-spec counter(integer(), evc()) -> integer().
 counter(NodeId, {VCList, _, _}) ->
 	{Counter, _} = lists:nth(NodeId, VCList),
 	Counter.
