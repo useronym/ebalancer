@@ -3,13 +3,13 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, send_tcp/2, notify/2, get_all_vclocks/0, take_msgs/1]).
+-export([start_link/0, send_tcp/2, notify/2, get_vclock/1, get_master_node/0, get_all_vclocks/0, take_msgs/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {
-    vc =
+    vc = undefined,
     msg_count = 0,
     msgs = [],
     buffer = []
@@ -33,12 +33,22 @@ send_tcp(From, Data) ->
 notify(Node, VC) ->
     gen_server:cast({?MODULE, Node}, {notify, VC}).
 
+%% Get vclock from the given node
+get_vclock(Node) ->
+    gen_server:call({?MODULE, Node}, get_vc).
+
+%% Find the node whose node_index is 1.
+get_master_node() ->
+    {Replies, _} = gen_server:multi_call(nodes(), ?MODULE, get_index, 5000),
+    {Node, 1} = lists:keyfind(1, 2, Replies),
+    Node.
+
 %% Get the latest VCs on all nodes.
 get_all_vclocks() ->
-    {Replies, []} = gen_server:multi_call(?MODULE, get_vc),
+    {Replies, []} = gen_server:multi_call([node() | nodes()], ?MODULE, get_vc, 5000),
     [VC || {_Node, VC} <- Replies].
 
-%% Take Count messages from the local node.
+%% Take messages from the local node until a given point.
 take_msgs(MaxVC) ->
     gen_server:call(?MODULE, {take_msgs, MaxVC}).
 
@@ -47,13 +57,22 @@ take_msgs(MaxVC) ->
 %%%-----------------------------------------------------------------------------
 
 init([]) ->
-    {ok, NodeId} = application:get_env(node_index),
-    Vclock = evc:new(NodeId),
+    Vclock = case application:get_env(node_index) of
+        {ok, 1} -> evc:new(1);
+        {ok, N} ->
+            timer:sleep(1000), % give the starting master node some time
+            MasterVC = {_, Delta, _} = get_vclock(get_master_node()),
+            evc:merge(evc:new(N), MasterVC, Delta)
+    end,
     {ok, #state{vc = Vclock}}.
 
 
 handle_call(get_vc, _From, State) ->
     {reply, State#state.vc, State};
+
+handle_call(get_index, _From, State) ->
+    {ok, Index} = application:get_env(node_index),
+    {reply, Index, State};
 
 handle_call({take_msgs, MaxVC}, _From, State) ->
     NewMsgs = lists:append(State#state.msgs, lists:reverse(State#state.buffer)),
@@ -62,8 +81,7 @@ handle_call({take_msgs, MaxVC}, _From, State) ->
             {reply, [], State};
         _ ->
             {MinVC, _, _} = hd(NewMsgs),
-            NodeId = evc:node_id(MinVC),
-            Count = evc:counter(NodeId, MaxVC) - evc:counter(MinVC),
+            Count = evc:counter(evc:node_id(MinVC), MaxVC) - evc:counter(MinVC),
             {Taken, Left} = lists:split(max(0, Count), NewMsgs),
             {reply, Taken, State#state{msgs = Left, buffer = []}}
     end.
