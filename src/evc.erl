@@ -146,3 +146,9 @@ example_test() ->
 	?assert(evc:descends(C1, B1)),
 	?assertNot(evc:descends(B1, C1)),
 	?assertNot(evc:descends(B1, A1)).
+
+simple_test() ->
+	VC1 = evc:increment(evc:new(1)),
+	?assertEqual(1, evc:counter(VC1)),
+	VC2 = evc:increment(VC1),
+	?assertEqual(2, counter(VC2)).
