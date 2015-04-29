@@ -9,9 +9,7 @@
 -module(evc).
 -author("xtovarn").
 
--ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
--endif.
 
 -define(DEFAULT_SIZE, 4).
 
@@ -131,7 +129,6 @@ perf1() ->
 	timer:sleep(500),
 	io:format("~90p~n", [[{node1, Node1_VC5}, {node4, Node4_VC4}]]).
 
--ifdef(TEST).
 example_test() ->
 	A = evc:new(1),
 	B = evc:new(2),
@@ -149,5 +146,3 @@ example_test() ->
 	?assert(evc:descends(C1, B1)),
 	?assertNot(evc:descends(B1, C1)),
 	?assertNot(evc:descends(B1, A1)).
-
--endif.
