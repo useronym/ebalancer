@@ -18,21 +18,26 @@
 %% API
 -export([perf1/0, new/1, increment/1, counter/1, merge/2, compare/2, descends/2]).
 
+-type timestamp() :: integer().
+-type evc() :: {list(), timestamp(), integer()}.
+
+-spec new(1..99) -> evc().
 new(NodeId) ->
 	new(NodeId, timestamp()).
 
 new(NodeId, NodeTime) ->
 	{set_nth(NodeId, {0, NodeTime}, [{-1, 0} || _ <- lists:seq(1, ?DEFAULT_SIZE)]), 0, NodeId}.
 
+-spec increment(evc()) -> evc().
 increment(VC) ->
 	increment(timestamp(), VC).
 
-%% CurrentTimestamp, {Vector Clock List, Timestamp Approximation, Node ID}
 increment(NodeTime, {VCList, TA, NodeId}) ->
 	{Counter, LastNodeTime} = lists:nth(NodeId, VCList),
 	TimeShift = NodeTime - LastNodeTime,
 	{set_nth(NodeId, {Counter + 1, NodeTime}, VCList), TA + TimeShift, NodeId}.
 
+-spec counter(evc()) -> integer().
 counter(VC = {_, _, NodeId}) ->
 	counter(NodeId, VC).
 
@@ -40,6 +45,7 @@ counter(NodeId, {VCList, _, _}) ->
 	{Counter, _} = lists:nth(NodeId, VCList),
 	Counter.
 
+-spec merge(evc(), evc()) -> evc().
 merge(VC1, VC2) ->
 	merge(timestamp(), VC1, VC2, 0).
 
@@ -53,6 +59,7 @@ merge(NodeTime, {LocalVCList, LocalTA, NodeId}, {RemoteVCList, RemoteTA, _}, RTT
 approximate_ta(LocalTA, RemoteTA, TimeShift, RTTDelta) ->
 	((LocalTA + TimeShift) + (RemoteTA + RTTDelta)) div 2.
 
+-spec descends(evc(), evc()) -> boolean().
 descends({VCList1, _, _}, {VCList2, _, _}) ->
 	descends_2(VCList1, VCList2).
 
@@ -63,6 +70,7 @@ descends_2([{H1, _} | T1], [{H2, _} | T2]) when H1 >= H2 ->
 descends_2(_, _) ->
 	false.
 
+-spec compare(evc(), evc()) -> boolean().
 compare(VC1, VC2) ->
 	case descends(VC2, VC1) of
 		true -> true;
