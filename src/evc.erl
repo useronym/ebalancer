@@ -16,7 +16,7 @@
 -define(DEFAULT_SIZE, 4).
 
 %% API
--export([perf1/0, new/1, increment/1, node_id/1, counter/1, counter/2, merge/2, compare/2, descends/2]).
+-export([perf1/0, new/1, increment/1, node_id/1, counter/1, counter/2, merge/2, merge/3, compare/2, descends/2]).
 
 -type timestamp() :: integer().
 -type evc() :: {list(), timestamp(), integer()}.
@@ -53,6 +53,10 @@ counter(NodeId, {VCList, _, _}) ->
 -spec merge(evc(), evc()) -> evc().
 merge(VC1, VC2) ->
 	merge(timestamp(), VC1, VC2, 0).
+
+-spec merge(evc(), evc(), integer()) -> evc().
+merge(VC1, VC2, RTTDelta) ->
+    merge(timestamp(), VC1, VC2, RTTDelta).
 
 merge(NodeTime, {LocalVCList, LocalTA, NodeId}, {RemoteVCList, RemoteTA, _}, RTTDelta) ->
 	{Counter, LastNodeTime} = lists:nth(NodeId, LocalVCList),
