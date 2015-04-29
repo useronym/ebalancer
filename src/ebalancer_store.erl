@@ -18,14 +18,14 @@
 
 -record(state, {}).
 
-add_balancer(ServerRef, BalancerId, Timeout) ->
-	gen_server:call(ServerRef, {add_balancer, BalancerId}, Timeout).
+add_balancer(ServerRef, BalancerIdAtom, Timeout) ->
+	gen_server:call(ServerRef, {add_balancer, BalancerIdAtom}, Timeout).
 
-remove_balancer(ServerRef, BalancerId, Timeout) ->
-	gen_server:call(ServerRef, {remove_balancer, BalancerId}, Timeout).
+remove_balancer(ServerRef, BalancerIdAtom, Timeout) ->
+	gen_server:call(ServerRef, {remove_balancer, BalancerIdAtom}, Timeout).
 
-store(ServerRef, BalancerId, RawData, Timeout) ->
-	gen_server:call(ServerRef, {store, BalancerId, RawData}, Timeout).
+store(ServerRef, BalancerIdAtom, RawData, Timeout) ->
+	gen_server:call(ServerRef, {store, BalancerIdAtom, RawData}, Timeout).
 
 %%%===================================================================
 %%% API
@@ -37,14 +37,14 @@ start_link() ->
 init([]) ->
 	{ok, #state{}}.
 
-handle_call({add_balancer, BalancerId}, _From, State) ->
-	ets:new(BalancerId, [ordered_set, named_table]),
+handle_call({add_balancer, BalancerIdAtom}, _From, State) ->
+	ets:new(BalancerIdAtom, [ordered_set, named_table]),
 	{reply, ok, State};
-handle_call({remove_balancer, BalancerId}, _From, State) ->
-	ets:delete(BalancerId),
+handle_call({remove_balancer, BalancerIdAtom}, _From, State) ->
+	ets:delete(BalancerIdAtom),
 	{reply, ok, State};
-handle_call({store, BalancerId, RawData}, _From, State) ->
-	ets:insert(BalancerId, RawData),
+handle_call({store, BalancerIdAtom, RawData}, _From, State) ->
+	ets:insert(BalancerIdAtom, RawData),
 	{reply, ok, State}.
 
 handle_cast(_Request, State) ->
