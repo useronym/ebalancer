@@ -34,5 +34,5 @@ test_perf() ->
 		fun() ->
 			[rh:rh2({balancer1, {1, I}}, Nodes, 1) || I <- lists:seq(1, 150000)]
 		end,
-	{Time, Value} = timer:tc(F),
-	{Time / 1000000, Value}.
+	{Time, _} = timer:tc(F),
+	io:format("~p seconds~n", [Time / 1000000]).
