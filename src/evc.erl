@@ -24,7 +24,7 @@ new(Node) ->
   new(Node, timestamp()).
 
 new(Node, NodeTime) ->
-  EmptyVCList = lists:keystore(Node, 1, [], {Node, {0, 0}}),
+  EmptyVCList = lists:keystore(Node, 1, [], {Node, 0}),
   {EmptyVCList, 0, {Node, NodeTime}}.
 
 -spec increment(evc()) -> evc().
@@ -32,9 +32,9 @@ increment(VC) ->
   increment(timestamp(), VC).
 
 increment(NodeTime, {VCList, TA, {Node, LastNodeTime}}) ->
-  {Node, {Counter, _}} = lists:keyfind(Node, 1, VCList),
+  {Node, Counter} = lists:keyfind(Node, 1, VCList),
   TimeShift = NodeTime - LastNodeTime,
-  NewVCList = lists:keyreplace(Node, 1, VCList, {Node, {Counter + 1, NodeTime}}),
+  NewVCList = lists:keyreplace(Node, 1, VCList, {Node, Counter + 1}),
   {NewVCList, TA + TimeShift, {Node, NodeTime}}.
 
 -spec node_id(evc()) -> atom().
@@ -47,7 +47,7 @@ counter(VC = {_, _, {Node, _}}) ->
 
 -spec counter(atom(), evc()) -> integer().
 counter(Node, {VCList, _, _}) ->
-  {_, {Counter, _}} = lists:keyfind(Node, 1, VCList),
+  {Node, Counter} = lists:keyfind(Node, 1, VCList),
   Counter.
 
 -spec merge(evc(), evc()) -> evc().
@@ -89,11 +89,11 @@ descends({VCList1, _, _}, {VCList2, _, _}) ->
 
 descends_2(_, []) ->
   true;
-descends_2(VCList1, [{Node2, {Counter2, _}} | T2]) ->
+descends_2(VCList1, [{Node2, Counter2} | T2]) ->
   case lists:keyfind(Node2, 1, VCList1) of
     false ->
       false;
-    {Node2, {Counter1, _}} ->
+    {Node2, Counter1} ->
       (Counter1 >= Counter2) andalso descends_2(VCList1, T2)
   end.
 
@@ -101,13 +101,13 @@ lte([], _) -> %% all the entries in VCList1 were matched
   true;
 lte(_, []) -> %% the first entry in VCList1 does not have counter-part in VCList2
   false;
-lte(VCList1 = [{Node1, {_, _}} | _], [{Node2, {_, _}} | T2]) when Node1 > Node2 ->
+lte(VCList1 = [{Node1, _} | _], [{Node2, _} | T2]) when Node1 > Node2 ->
   lte(VCList1, T2);
-lte([{Node1, {_, _}} | _], [{Node2, {_, _}} | _]) when Node1 < Node2 ->
+lte([{Node1, _} | _], [{Node2, _} | _]) when Node1 < Node2 ->
   false;
-lte([{_, {Counter1, _}} | _], [{_, {Counter2, _}} | _]) when Counter1 > Counter2 ->
+lte([{_, Counter1} | _], [{_, Counter2} | _]) when Counter1 > Counter2 ->
   false;
-lte([{_, {_, _}} | T1], [{_, {_, _}} | T2]) -> %% the patterns above did not match -> i.e Node1 == Node2 andalso Counter1 =< Counter2
+lte([{_, _} | T1], [{_, _} | T2]) -> %% the patterns above did not match -> i.e Node1 == Node2 andalso Counter1 =< Counter2
   lte(T1, T2).
 
 -spec compare(evc(), evc()) -> boolean().
