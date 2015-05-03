@@ -67,9 +67,12 @@ merge(NodeTime, {LocalVCList, LocalTA, {Node, LastNodeTime}}, {RemoteVCList, Rem
 vclist_merge(VCList1, VCList2) ->
   lists:reverse(keymerge(VCList1, VCList2, [], fun max/2)).
 
-keymerge([], [], M, _Fun) -> M;
-keymerge([], Rest, M, _Fun) -> lists:reverse(Rest, M);
-keymerge(Rest, [], M, _Fun) -> lists:reverse(Rest, M);
+keymerge([], [], M, _Fun) ->
+  M;
+keymerge([], Rest, M, _Fun) ->
+  lists:reverse(Rest, M);
+keymerge(Rest, [], M, _Fun) ->
+  lists:reverse(Rest, M);
 keymerge([A = {K1, _} | T1], L2 = [{K2, _} | _T2], M, Fun) when K1 < K2 ->
   keymerge(T1, L2, [A | M], Fun);
 keymerge(L1 = [{K1, _} | _T1], [B = {K2, _} | T2], M, Fun) when K1 > K2 ->
