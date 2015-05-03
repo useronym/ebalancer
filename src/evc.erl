@@ -35,7 +35,7 @@ increment(NodeTime, {VCList, TA, Node}) ->
   TimeShift = NodeTime - LastNodeTime,
   {lists:keyreplace(Node, 1, VCList, {Node, {Counter + 1, NodeTime}}), TA + TimeShift, Node}.
 
--spec node_id(evc()) -> integer().
+-spec node_id(evc()) -> atom().
 node_id({_, _, Node}) ->
   Node.
 
