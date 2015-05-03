@@ -96,18 +96,18 @@ descends_2(VCList1, [{Node2, Counter2} | T2]) ->
       (Counter1 >= Counter2) andalso descends_2(VCList1, T2)
   end.
 
-lte([], _) -> %% all the entries in VCList1 were matched
+vclist_lte([], _) -> %% all the entries in VCList1 were matched
   true;
-lte(_, []) -> %% the first entry in VCList1 does not have counter-part in VCList2
+vclist_lte(_, []) -> %% the first entry in VCList1 does not have counter-part in VCList2
   false;
-lte(VCList1 = [{Node1, _} | _], [{Node2, _} | T2]) when Node1 > Node2 ->
-  lte(VCList1, T2);
-lte([{Node1, _} | _], [{Node2, _} | _]) when Node1 < Node2 ->
+vclist_lte(VCList1 = [{Node1, _} | _], [{Node2, _} | T2]) when Node1 > Node2 ->
+  vclist_lte(VCList1, T2);
+vclist_lte([{Node1, _} | _], [{Node2, _} | _]) when Node1 < Node2 ->
   false;
-lte([{_, Counter1} | _], [{_, Counter2} | _]) when Counter1 > Counter2 ->
+vclist_lte([{_, Counter1} | _], [{_, Counter2} | _]) when Counter1 > Counter2 ->
   false;
-lte([{_, _} | T1], [{_, _} | T2]) -> %% the patterns above did not match -> i.e Node1 == Node2 andalso Counter1 =< Counter2
-  lte(T1, T2).
+vclist_lte([{_, _} | T1], [{_, _} | T2]) -> %% the patterns above did not match -> i.e Node1 == Node2 andalso Counter1 =< Counter2
+  vclist_lte(T1, T2).
 
 -spec compare(evc(), evc()) -> boolean().
 compare(VC1, VC2) ->
@@ -166,12 +166,12 @@ keymerge_test() ->
   Result = keymerge([{a, 1}, {b, 2}, {d, 4}, {e, 5}], [{b, 4}, {c, 3}, {d, 4}, {e, 6}, {g, 17}], [], fun max/2),
   ?assertEqual([{a, 1}, {b, 4}, {c, 3}, {d, 4}, {e, 6}, {g, 17}], lists:reverse(Result)).
 
-lte1_test() ->
-  ?assertNot(lte([{a, 1}, {b, 2}], [{a, 2}, {b, 1}])),
-  ?assert(lte([{a, 1}, {b, 1}], [{a, 2}, {b, 1}])),
-  ?assert(lte([{a, 1}, {b, 1}], [{a, 1}, {b, 1}])),
-  ?assertNot(lte([{a, 5}, {b, 1}], [{b, 1}])),
-  ?assert(lte([{b, 1}], [{a, 5}, {b, 1}])).
+vclist_lte1_test() ->
+  ?assertNot(vclist_lte([{a, 1}, {b, 2}], [{a, 2}, {b, 1}])),
+  ?assert(vclist_lte([{a, 1}, {b, 1}], [{a, 2}, {b, 1}])),
+  ?assert(vclist_lte([{a, 1}, {b, 1}], [{a, 1}, {b, 1}])),
+  ?assertNot(vclist_lte([{a, 5}, {b, 1}], [{b, 1}])),
+  ?assert(vclist_lte([{b, 1}], [{a, 5}, {b, 1}])).
 
 example_test() ->
   A = evc:new(node1),
