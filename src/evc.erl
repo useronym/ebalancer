@@ -146,17 +146,17 @@ perf1() ->
   Node1_VC3 = evc:increment(evc:increment(Node1_VC2)),
   Node4_VC2 = evc:increment(evc:increment(Node4_VC1)),
   Merge1 = merge(Node4_VC2, Node1_VC3),
-  io:format("~140p~n", [[{node1, Node1_VC3}, {node4, Node4_VC2}]]),
+  io:format("~140p~n", [[{Node1_VC3}, {Node4_VC2}]]),
   timer:sleep(500),
   Node1_VC4 = evc:increment(Node1_VC3),
   Node4_VC3 = evc:increment(Merge1),
-  io:format("~140p~n", [[{node1, Node1_VC4}, {node4, Node4_VC3}]]),
+  io:format("~140p~n", [[{Node1_VC4}, {Node4_VC3}]]),
   Merge2 = merge(Node1_VC4, Node4_VC3),
   timer:sleep(100),
   Node1_VC5 = evc:increment(Merge2),
   Node4_VC4 = evc:increment(Node4_VC3),
   timer:sleep(500),
-  io:format("~140p~n", [[{node1, Node1_VC5}, {node4, Node4_VC4}]]).
+  io:format("~140p~n", [[{Node1_VC5}, {Node4_VC4}]]).
 
 %% ===================================================================
 %% Tests
