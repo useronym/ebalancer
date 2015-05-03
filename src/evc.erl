@@ -14,7 +14,7 @@
 -define(DEFAULT_SIZE, 4).
 
 %% API
--export([perf1/0, new/1, increment/1, node_id/1, counter/1, counter/2, merge/2, merge/3, compare/2, descends/2]).
+-export([perf1/0, new/1, increment/1, node_id/1, counter/1, counter/2, merge/2, merge/3, compare/2]).
 
 -type timestamp() :: integer().
 -type evc() :: {list(), timestamp(), {atom(), timestamp()}}.
@@ -81,20 +81,6 @@ keymerge([{K, V1} | T1], [{K, V2} | T2], M, Fun) -> %% when keys are equal
 
 approximate_ta(LocalTA, RemoteTA, TimeShift, RTTDelta) ->
   ((LocalTA + TimeShift) + (RemoteTA + RTTDelta)) div 2.
-
--spec descends(evc(), evc()) -> boolean().
-descends({VCList1, _, _}, {VCList2, _, _}) ->
-  descends_2(VCList1, VCList2).
-
-descends_2(_, []) ->
-  true;
-descends_2(VCList1, [{Node2, Counter2} | T2]) ->
-  case lists:keyfind(Node2, 1, VCList1) of
-    false ->
-      false;
-    {Node2, Counter1} ->
-      (Counter1 >= Counter2) andalso descends_2(VCList1, T2)
-  end.
 
 vcl_lte([], _) -> %% all the entries in VCList1 were matched
   true;
