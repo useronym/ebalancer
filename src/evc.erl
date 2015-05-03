@@ -173,23 +173,23 @@ vclist_lte1_test() ->
   ?assertNot(vclist_lte([{a, 5}, {b, 1}], [{b, 1}])),
   ?assert(vclist_lte([{b, 1}], [{a, 5}, {b, 1}])).
 
-example_test() ->
+compare_test() ->
   A = evc:new(node1),
   B = evc:new(node2),
   A1 = evc:increment(A),
   B1 = evc:increment(B),
-  ?assert(evc:descends(A1, A)),
-  ?assert(evc:descends(B1, B)),
-  ?assertNot(evc:descends(A1, B1)),
+  ?assert(evc:compare(A, A1)),
+  ?assert(evc:compare(B, B1)),
+  ?assert(evc:compare(A1, B1)),
   A2 = evc:increment(A1),
   C = evc:merge(A2, B1),
   C1 = evc:increment(C),
   ?assertEqual(2, counter(A2)),
   ?assertEqual(3, counter(C1)),
-  ?assert(evc:descends(C1, A2)),
-  ?assert(evc:descends(C1, B1)),
-  ?assertNot(evc:descends(B1, C1)),
-  ?assertNot(evc:descends(B1, A1)).
+  ?assert(evc:compare(A2, C1)),
+  ?assert(evc:compare(B1, C1)),
+  ?assertNot(evc:compare(C1, B1)),
+  ?assertNot(evc:compare(B1, A1)).
 
 simple_test() ->
   VC1 = evc:increment(evc:new(1)),
