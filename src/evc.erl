@@ -17,7 +17,7 @@
 -export([perf1/0, new/1, increment/1, node_id/1, counter/1, counter/2, merge/2, merge/3, compare/2, descends/2]).
 
 -type timestamp() :: integer().
--type evc() :: {list(), timestamp(), integer()}.
+-type evc() :: {list(), timestamp(), {atom(), integer()}}.
 
 -spec new(1..99) -> evc().
 new(Node) ->
