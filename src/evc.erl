@@ -147,7 +147,7 @@ keymerge_test() ->
   Result = keymerge([{a, 1}, {b, 2}, {d, 4}, {e, 5}], [{b, 4}, {c, 3}, {d, 4}, {e, 6}, {g, 17}], [], fun max/2),
   ?assertEqual([{a, 1}, {b, 4}, {c, 3}, {d, 4}, {e, 6}, {g, 17}], lists:reverse(Result)).
 
-vclist_lte1_test() ->
+vcl_lte_test() ->
   ?assertNot(vcl_lte([{a, 1}, {b, 2}], [{a, 2}, {b, 1}])),
   ?assert(vcl_lte([{a, 1}, {b, 1}], [{a, 2}, {b, 1}])),
   ?assert(vcl_lte([{a, 1}, {b, 1}], [{a, 1}, {b, 1}])),
@@ -178,22 +178,22 @@ simple_test() ->
   VC2 = evc:increment(VC1),
   ?assertEqual(2, counter(VC2)).
 
-vclist_merge_test() ->
+vcl_merge_test() ->
   VC1 = [{node1, 1}, {node2, 2}, {node4, 4}],
   VC2 = [{node3, 3}, {node4, 3}],
   ?assertEqual([{node1, 1}, {node2, 2}, {node3, 3}, {node4, 4}], vcl_merge(VC1, VC2)).
 
-vclist_merge_less_left_test() ->
+vcl_merge_less_left_test() ->
   VC1 = [{node5, 5}],
   VC2 = [{node6, 6}, {node7, 7}],
   ?assertEqual([{node5, 5}, {node6, 6}, {node7, 7}], vcl_merge(VC1, VC2)).
 
-vclist_merge_less_right_test() ->
+vcl_merge_less_right_test() ->
   VC1 = [{node6, 6}, {node7, 7}],
   VC2 = [{node5, 5}],
   ?assertEqual([{node5, 5}, {node6, 6}, {node7, 7}], vcl_merge(VC1, VC2)).
 
-vclist_merge_same_id_test() ->
+vcl_merge_same_id_test() ->
   VC1 = [{node1, 1}, {node2, 1}],
   VC2 = [{node1, 1}, {node3, 1}],
   ?assertEqual([{node1, 1}, {node2, 1}, {node3, 1}], vcl_merge(VC1, VC2)).
