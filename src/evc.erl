@@ -24,23 +24,25 @@ new(Node) ->
   new(Node, timestamp()).
 
 new(Node, NodeTime) ->
-  {lists:keystore(Node, 1, [], {Node, {0, NodeTime}}), 0, Node}.
+  EmptyVCList = lists:keystore(Node, 1, [], {Node, {0, 0}}),
+  {EmptyVCList, 0, {Node, NodeTime}}.
 
 -spec increment(evc()) -> evc().
 increment(VC) ->
   increment(timestamp(), VC).
 
-increment(NodeTime, {VCList, TA, Node}) ->
-  {Node, {Counter, LastNodeTime}} = lists:keyfind(Node, 1, VCList),
+increment(NodeTime, {VCList, TA, {Node, LastNodeTime}}) ->
+  {Node, {Counter, _}} = lists:keyfind(Node, 1, VCList),
   TimeShift = NodeTime - LastNodeTime,
-  {lists:keyreplace(Node, 1, VCList, {Node, {Counter + 1, NodeTime}}), TA + TimeShift, Node}.
+  NewVCList = lists:keyreplace(Node, 1, VCList, {Node, {Counter + 1, NodeTime}}),
+  {NewVCList, TA + TimeShift, {Node, NodeTime}}.
 
 -spec node_id(evc()) -> atom().
-node_id({_, _, Node}) ->
+node_id({_, _, {Node, _}}) ->
   Node.
 
 -spec counter(evc()) -> integer().
-counter(VC = {_, _, Node}) ->
+counter(VC = {_, _, {Node, _}}) ->
   counter(Node, VC).
 
 -spec counter(integer(), evc()) -> integer().
@@ -56,13 +58,11 @@ merge(VC1, VC2) ->
 merge(VC1, VC2, RTTDelta) ->
   merge(timestamp(), VC1, VC2, RTTDelta).
 
-merge(NodeTime, {LocalVCList, LocalTA, Node}, {RemoteVCList, RemoteTA, _}, RTTDelta) ->
-  {Node, {Counter, LastNodeTime}} = lists:keyfind(Node, 1, LocalVCList),
+merge(NodeTime, {LocalVCList, LocalTA, {Node, LastNodeTime}}, {RemoteVCList, RemoteTA, _}, RTTDelta) ->
   TimeShift = NodeTime - LastNodeTime,
-  UpdatedLocalVCList = lists:keyreplace(Node, 1, LocalVCList, {Node, {Counter, NodeTime}}),
-  VCListMerge = vclist_merge(UpdatedLocalVCList, RemoteVCList),
+  VCListMerge = vclist_merge(LocalVCList, RemoteVCList),
   TAAproximation = approximate_ta(LocalTA, RemoteTA, TimeShift, RTTDelta),
-  {VCListMerge, TAAproximation, Node}.
+  {VCListMerge, TAAproximation, {Node, NodeTime}}.
 
 vclist_merge(VCList1, VCList2) ->
   lists:reverse(keymerge(VCList1, VCList2, [], fun max/2)).
@@ -131,17 +131,17 @@ perf1() ->
   Node1_VC3 = evc:increment(evc:increment(Node1_VC2)),
   Node4_VC2 = evc:increment(evc:increment(Node4_VC1)),
   Merge1 = merge(Node4_VC2, Node1_VC3),
-  io:format("~90p~n", [[{node1, Node1_VC3}, {node4, Node4_VC2}]]),
+  io:format("~140p~n", [[{node1, Node1_VC3}, {node4, Node4_VC2}]]),
   timer:sleep(500),
   Node1_VC4 = evc:increment(Node1_VC3),
   Node4_VC3 = evc:increment(Merge1),
-  io:format("~90p~n", [[{node1, Node1_VC4}, {node4, Node4_VC3}]]),
+  io:format("~140p~n", [[{node1, Node1_VC4}, {node4, Node4_VC3}]]),
   Merge2 = merge(Node1_VC4, Node4_VC3),
   timer:sleep(100),
   Node1_VC5 = evc:increment(Merge2),
   Node4_VC4 = evc:increment(Node4_VC3),
   timer:sleep(500),
-  io:format("~90p~n", [[{node1, Node1_VC5}, {node4, Node4_VC4}]]).
+  io:format("~140p~n", [[{node1, Node1_VC5}, {node4, Node4_VC4}]]).
 
 %% ===================================================================
 %% Tests
@@ -149,7 +149,7 @@ perf1() ->
 
 keymerge_test() ->
   Result = keymerge([{a, 1}, {b, 2}, {d, 4}, {e, 5}], [{b, 4}, {c, 3}, {d, 4}, {e, 6}, {g, 17}], [], fun max/2),
-  ?assertEqual([{a, 1}, {b, 4}, {c, 3}, {d, 4}, {e, 6}, {g, 17}], Result).
+  ?assertEqual([{a, 1}, {b, 4}, {c, 3}, {d, 4}, {e, 6}, {g, 17}], lists:reverse(Result)).
 
 example_test() ->
   A = evc:new(node1),
