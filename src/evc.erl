@@ -167,6 +167,13 @@ keymerge_test() ->
   Result = keymerge([{a, 1}, {b, 2}, {d, 4}, {e, 5}], [{b, 4}, {c, 3}, {d, 4}, {e, 6}, {g, 17}], [], fun max/2),
   ?assertEqual([{a, 1}, {b, 4}, {c, 3}, {d, 4}, {e, 6}, {g, 17}], lists:reverse(Result)).
 
+lte1_test() ->
+  ?assertNot(lte([{a, {1, 1}}, {b, {2, 2}}], [{a, {2, 2}}, {b, {1, 1}}])),
+  ?assert(lte([{a, {1, 1}}, {b, {1, 1}}], [{a, {2, 2}}, {b, {1, 1}}])),
+  ?assert(lte([{a, {1, 1}}, {b, {1, 1}}], [{a, {1, 1}}, {b, {1, 1}}])),
+  ?assertNot(lte([{a, {5, 5}}, {b, {1, 1}}], [{b, {1, 1}}])),
+  ?assert(lte([{b, {1, 1}}], [{a, {5, 5}}, {b, {1, 1}}])).
+
 example_test() ->
   A = evc:new(node1),
   B = evc:new(node2),
