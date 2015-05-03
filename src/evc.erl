@@ -63,6 +63,7 @@ merge(NodeTime, {LocalVCList, LocalTA, {Node, LastNodeTime}}, {RemoteVCList, Rem
   TAAproximation = approximate_ta(LocalTA, RemoteTA, TimeShift, RTTDelta),
   {VCListMerge, TAAproximation, {Node, NodeTime}}.
 
+%% merges VCLists, when the keys are equal the one with larger counter is chosen
 vcl_merge(VCList1, VCList2) ->
   lists:reverse(keymerge(VCList1, VCList2, [], fun max/2)).
 
@@ -94,6 +95,7 @@ compare({VCList1, TA1, {Node1, _}}, {VCList2, TA2, {Node2, _}}) ->
       end
   end.
 
+%% returns true IFF all the entries in the VCList1 are less than equal the corresponding entries in VCList2
 vcl_lte([], _) -> %% all the entries in VCList1 were matched
   true;
 vcl_lte(_, []) -> %% the first entry in VCList1 does not have counter-part in VCList2
