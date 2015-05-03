@@ -59,11 +59,11 @@ merge(VC1, VC2, RTTDelta) ->
 
 merge(NodeTime, {LocalVCList, LocalTA, {Node, LastNodeTime}}, {RemoteVCList, RemoteTA, _}, RTTDelta) ->
   TimeShift = NodeTime - LastNodeTime,
-  VCListMerge = vclist_merge(LocalVCList, RemoteVCList),
+  VCListMerge = vcl_merge(LocalVCList, RemoteVCList),
   TAAproximation = approximate_ta(LocalTA, RemoteTA, TimeShift, RTTDelta),
   {VCListMerge, TAAproximation, {Node, NodeTime}}.
 
-vclist_merge(VCList1, VCList2) ->
+vcl_merge(VCList1, VCList2) ->
   lists:reverse(keymerge(VCList1, VCList2, [], fun max/2)).
 
 keymerge([], [], M, _Fun) ->
@@ -82,6 +82,17 @@ keymerge([{K, V1} | T1], [{K, V2} | T2], M, Fun) -> %% when keys are equal
 approximate_ta(LocalTA, RemoteTA, TimeShift, RTTDelta) ->
   ((LocalTA + TimeShift) + (RemoteTA + RTTDelta)) div 2.
 
+-spec compare(evc(), evc()) -> boolean().
+compare({VCList1, TA1, {Node1, _}}, {VCList2, TA2, {Node2, _}}) ->
+  case vcl_lte(VCList1, VCList2) of
+    true -> true; %% the VCList1 is lower than or equal VCList2 -> so is the whole EVC
+    false -> %% VCList1 can be either greater than VCList2, or concurrent
+      case vcl_lte(VCList2, VCList1) of
+        true -> false; %% the VCList1 is greater than VCList2 -> so is the whole EVC
+        false -> {TA1, Node1} =< {TA2, Node2} %% The VCLists are concurrent -> TIEBREAK: Timestamp Approx. and then Node Name
+      end
+  end.
+
 vcl_lte([], _) -> %% all the entries in VCList1 were matched
   true;
 vcl_lte(_, []) -> %% the first entry in VCList1 does not have counter-part in VCList2
@@ -94,17 +105,6 @@ vcl_lte([{_, Counter1} | _], [{_, Counter2} | _]) when Counter1 > Counter2 ->
   false;
 vcl_lte([{_, _} | T1], [{_, _} | T2]) -> %% the patterns above did not match -> i.e Node1 == Node2 andalso Counter1 =< Counter2
   vcl_lte(T1, T2).
-
--spec compare(evc(), evc()) -> boolean().
-compare({VCList1, TA1, {Node1, _}}, {VCList2, TA2, {Node2, _}}) ->
-  case vcl_lte(VCList1, VCList2) of
-    true -> true; %% the VCList1 is lower than or equal VCList2 -> so is the whole EVC
-    false -> %% VCList1 can be either greater than VCList2, or concurrent
-      case vcl_lte(VCList2, VCList1) of
-        true -> false; %% the VCList1 is greater than VCList2 -> so is the whole EVC
-        false -> {TA1, Node1} =< {TA2, Node2} %% The VCLists are concurrent -> TIEBREAK: Timestamp Approx. and then Node Name
-      end
-  end.
 
 %% ===================================================================
 %% Private functions
@@ -181,19 +181,19 @@ simple_test() ->
 vclist_merge_test() ->
   VC1 = [{node1, 1}, {node2, 2}, {node4, 4}],
   VC2 = [{node3, 3}, {node4, 3}],
-  ?assertEqual([{node1, 1}, {node2, 2}, {node3, 3}, {node4, 4}], vclist_merge(VC1, VC2)).
+  ?assertEqual([{node1, 1}, {node2, 2}, {node3, 3}, {node4, 4}], vcl_merge(VC1, VC2)).
 
 vclist_merge_less_left_test() ->
   VC1 = [{node5, 5}],
   VC2 = [{node6, 6}, {node7, 7}],
-  ?assertEqual([{node5, 5}, {node6, 6}, {node7, 7}], vclist_merge(VC1, VC2)).
+  ?assertEqual([{node5, 5}, {node6, 6}, {node7, 7}], vcl_merge(VC1, VC2)).
 
 vclist_merge_less_right_test() ->
   VC1 = [{node6, 6}, {node7, 7}],
   VC2 = [{node5, 5}],
-  ?assertEqual([{node5, 5}, {node6, 6}, {node7, 7}], vclist_merge(VC1, VC2)).
+  ?assertEqual([{node5, 5}, {node6, 6}, {node7, 7}], vcl_merge(VC1, VC2)).
 
 vclist_merge_same_id_test() ->
   VC1 = [{node1, 1}, {node2, 1}],
   VC2 = [{node1, 1}, {node3, 1}],
-  ?assertEqual([{node1, 1}, {node2, 1}, {node3, 1}], vclist_merge(VC1, VC2)).
+  ?assertEqual([{node1, 1}, {node2, 1}, {node3, 1}], vcl_merge(VC1, VC2)).
