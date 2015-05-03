@@ -94,6 +94,19 @@ descends_2(VCList1, [{Node2, {Counter2, _}} | T2]) ->
       (Counter1 >= Counter2) andalso descends_2(VCList1, T2)
   end.
 
+lte([], _) -> %% all the entries in VCList1 were matched
+  true;
+lte(_, []) -> %% the first entry in VCList1 does not have counter-part in VCList2
+  false;
+lte(VCList1 = [{Node1, {_, _}} | _], [{Node2, {_, _}} | T2]) when Node1 > Node2 ->
+  lte(VCList1, T2);
+lte([{Node1, {_, _}} | _], [{Node2, {_, _}} | _]) when Node1 < Node2 ->
+  false;
+lte([{_, {Counter1, _}} | _], [{_, {Counter2, _}} | _]) when Counter1 > Counter2 ->
+  false;
+lte([{_, {_, _}} | T1], [{_, {_, _}} | T2]) -> %% the patterns above did not match -> i.e Node1 == Node2 andalso Counter1 =< Counter2
+  lte(T1, T2).
+
 -spec compare(evc(), evc()) -> boolean().
 compare(VC1, VC2) ->
   case descends(VC2, VC1) of
