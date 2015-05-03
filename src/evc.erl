@@ -98,11 +98,11 @@ vcl_lte([{_, _} | T1], [{_, _} | T2]) -> %% the patterns above did not match -> 
 -spec compare(evc(), evc()) -> boolean().
 compare({VCList1, TA1, {Node1, _}}, {VCList2, TA2, {Node2, _}}) ->
   case vcl_lte(VCList1, VCList2) of
-    true -> true;
-    false ->
+    true -> true; %% the VCList1 is lower than or equal VCList2 -> so is the whole EVC
+    false -> %% VCList1 can be either greater than VCList2, or concurrent
       case vcl_lte(VCList2, VCList1) of
-        true -> false;
-        false -> {TA1, Node1} =< {TA2, Node2}
+        true -> false; %% the VCList1 is greater than VCList2 -> so is the whole EVC
+        false -> {TA1, Node1} =< {TA2, Node2} %% The VCLists are concurrent -> TIEBREAK: Timestamp Approx. and then Node Name
       end
   end.
 
