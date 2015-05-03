@@ -17,9 +17,9 @@
 -export([perf1/0, new/1, increment/1, node_id/1, counter/1, counter/2, merge/2, merge/3, compare/2, descends/2]).
 
 -type timestamp() :: integer().
--type evc() :: {list(), timestamp(), {atom(), integer()}}.
+-type evc() :: {list(), timestamp(), {atom(), timestamp()}}.
 
--spec new(1..99) -> evc().
+-spec new(atom()) -> evc().
 new(Node) ->
   new(Node, timestamp()).
 
@@ -45,7 +45,7 @@ node_id({_, _, {Node, _}}) ->
 counter(VC = {_, _, {Node, _}}) ->
   counter(Node, VC).
 
--spec counter(integer(), evc()) -> integer().
+-spec counter(atom(), evc()) -> integer().
 counter(Node, {VCList, _, _}) ->
   {_, {Counter, _}} = lists:keyfind(Node, 1, VCList),
   Counter.
