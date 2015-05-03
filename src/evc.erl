@@ -66,6 +66,7 @@ merge(NodeTime, {LocalVCList, LocalTA, {Node, LastNodeTime}}, {RemoteVCList, Rem
 vcl_merge(VCList1, VCList2) ->
   lists:reverse(keymerge(VCList1, VCList2, [], fun max/2)).
 
+%% merges lists by keys, calls Fun when the keys are equal, inspired by lists:keymerge/4
 keymerge([], [], M, _Fun) ->
   M;
 keymerge([], Rest, M, _Fun) ->
