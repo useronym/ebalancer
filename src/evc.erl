@@ -168,11 +168,11 @@ keymerge_test() ->
   ?assertEqual([{a, 1}, {b, 4}, {c, 3}, {d, 4}, {e, 6}, {g, 17}], lists:reverse(Result)).
 
 lte1_test() ->
-  ?assertNot(lte([{a, {1, 1}}, {b, {2, 2}}], [{a, {2, 2}}, {b, {1, 1}}])),
-  ?assert(lte([{a, {1, 1}}, {b, {1, 1}}], [{a, {2, 2}}, {b, {1, 1}}])),
-  ?assert(lte([{a, {1, 1}}, {b, {1, 1}}], [{a, {1, 1}}, {b, {1, 1}}])),
-  ?assertNot(lte([{a, {5, 5}}, {b, {1, 1}}], [{b, {1, 1}}])),
-  ?assert(lte([{b, {1, 1}}], [{a, {5, 5}}, {b, {1, 1}}])).
+  ?assertNot(lte([{a, 1}, {b, 2}], [{a, 2}, {b, 1}])),
+  ?assert(lte([{a, 1}, {b, 1}], [{a, 2}, {b, 1}])),
+  ?assert(lte([{a, 1}, {b, 1}], [{a, 1}, {b, 1}])),
+  ?assertNot(lte([{a, 5}, {b, 1}], [{b, 1}])),
+  ?assert(lte([{b, 1}], [{a, 5}, {b, 1}])).
 
 example_test() ->
   A = evc:new(node1),
@@ -199,21 +199,21 @@ simple_test() ->
   ?assertEqual(2, counter(VC2)).
 
 vclist_merge_test() ->
-  VC1 = [{node1, {1, 1}}, {node2, {2, 2}}, {node4, {4, 4}}],
-  VC2 = [{node3, {3, 3}}, {node4, {3, 3}}],
-  ?assertEqual([{node1, {1, 1}}, {node2, {2, 2}}, {node3, {3, 3}}, {node4, {4, 4}}], vclist_merge(VC1, VC2)).
+  VC1 = [{node1, 1}, {node2, 2}, {node4, 4}],
+  VC2 = [{node3, 3}, {node4, 3}],
+  ?assertEqual([{node1, 1}, {node2, 2}, {node3, 3}, {node4, 4}], vclist_merge(VC1, VC2)).
 
 vclist_merge_less_left_test() ->
-  VC1 = [{node5, {5, 5}}],
-  VC2 = [{node6, {6, 6}}, {node7, {7, 7}}],
-  ?assertEqual([{node5, {5, 5}}, {node6, {6, 6}}, {node7, {7, 7}}], vclist_merge(VC1, VC2)).
+  VC1 = [{node5, 5}],
+  VC2 = [{node6, 6}, {node7, 7}],
+  ?assertEqual([{node5, 5}, {node6, 6}, {node7, 7}], vclist_merge(VC1, VC2)).
 
 vclist_merge_less_right_test() ->
-  VC1 = [{node6, {6, 6}}, {node7, {7, 7}}],
-  VC2 = [{node5, {5, 5}}],
-  ?assertEqual([{node5, {5, 5}}, {node6, {6, 6}}, {node7, {7, 7}}], vclist_merge(VC1, VC2)).
+  VC1 = [{node6, 6}, {node7, 7}],
+  VC2 = [{node5, 5}],
+  ?assertEqual([{node5, 5}, {node6, 6}, {node7, 7}], vclist_merge(VC1, VC2)).
 
 vclist_merge_same_id_test() ->
-  VC1 = [{node1, {1, 2}}, {node2, {1, 4}}],
-  VC2 = [{node1, {1, 3}}, {node3, {1, 5}}],
-  ?assertEqual([{node1, {1, 3}}, {node2, {1, 4}}, {node3, {1, 5}}], vclist_merge(VC1, VC2)).
+  VC1 = [{node1, 1}, {node2, 1}],
+  VC2 = [{node1, 1}, {node3, 1}],
+  ?assertEqual([{node1, 1}, {node2, 1}, {node3, 1}], vclist_merge(VC1, VC2)).
