@@ -20,32 +20,32 @@
 -type evc() :: {list(), timestamp(), integer()}.
 
 -spec new(1..99) -> evc().
-new(NodeId) ->
-  new(NodeId, timestamp()).
+new(Node) ->
+  new(Node, timestamp()).
 
-new(NodeId, NodeTime) ->
-  {lists:keystore(NodeId, 1, [], {NodeId, {0, NodeTime}}), 0, NodeId}.
+new(Node, NodeTime) ->
+  {lists:keystore(Node, 1, [], {Node, {0, NodeTime}}), 0, Node}.
 
 -spec increment(evc()) -> evc().
 increment(VC) ->
   increment(timestamp(), VC).
 
-increment(NodeTime, {VCList, TA, NodeId}) ->
-  {NodeId, {Counter, LastNodeTime}} = lists:keyfind(NodeId, 1, VCList),
+increment(NodeTime, {VCList, TA, Node}) ->
+  {Node, {Counter, LastNodeTime}} = lists:keyfind(Node, 1, VCList),
   TimeShift = NodeTime - LastNodeTime,
-  {lists:keyreplace(NodeId, 1, VCList, {NodeId, {Counter + 1, NodeTime}}), TA + TimeShift, NodeId}.
+  {lists:keyreplace(Node, 1, VCList, {Node, {Counter + 1, NodeTime}}), TA + TimeShift, Node}.
 
 -spec node_id(evc()) -> integer().
-node_id({_, _, NodeId}) ->
-  NodeId.
+node_id({_, _, Node}) ->
+  Node.
 
 -spec counter(evc()) -> integer().
-counter(VC = {_, _, NodeId}) ->
-  counter(NodeId, VC).
+counter(VC = {_, _, Node}) ->
+  counter(Node, VC).
 
 -spec counter(integer(), evc()) -> integer().
-counter(NodeId, {VCList, _, _}) ->
-  {_, {Counter, _}} = lists:keyfind(NodeId, 1, VCList),
+counter(Node, {VCList, _, _}) ->
+  {_, {Counter, _}} = lists:keyfind(Node, 1, VCList),
   Counter.
 
 -spec merge(evc(), evc()) -> evc().
@@ -56,13 +56,13 @@ merge(VC1, VC2) ->
 merge(VC1, VC2, RTTDelta) ->
   merge(timestamp(), VC1, VC2, RTTDelta).
 
-merge(NodeTime, {LocalVCList, LocalTA, NodeId}, {RemoteVCList, RemoteTA, _}, RTTDelta) ->
-  {NodeId, {Counter, LastNodeTime}} = lists:keyfind(NodeId, 1, LocalVCList),
+merge(NodeTime, {LocalVCList, LocalTA, Node}, {RemoteVCList, RemoteTA, _}, RTTDelta) ->
+  {Node, {Counter, LastNodeTime}} = lists:keyfind(Node, 1, LocalVCList),
   TimeShift = NodeTime - LastNodeTime,
-  UpdatedLocalVCList = lists:keyreplace(NodeId, 1, LocalVCList, {NodeId, {Counter, NodeTime}}),
+  UpdatedLocalVCList = lists:keyreplace(Node, 1, LocalVCList, {Node, {Counter, NodeTime}}),
   VCListMerge = vclist_merge(UpdatedLocalVCList, RemoteVCList),
   TAAproximation = approximate_ta(LocalTA, RemoteTA, TimeShift, RTTDelta),
-  {VCListMerge, TAAproximation, NodeId}.
+  {VCListMerge, TAAproximation, Node}.
 
 vclist_merge(VCList1, VCList2) ->
   lists:reverse(keymerge(VCList1, VCList2, [], fun max/2)).
