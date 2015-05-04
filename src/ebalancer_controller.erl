@@ -10,7 +10,6 @@
 
 -record(state, {
     vc = undefined,
-    msg_count = 0,
     msgs = [],
     buffer = []
 }).
