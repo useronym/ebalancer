@@ -44,7 +44,6 @@ node_id({_, _, {Node, _}}) ->
 counter(Node, {VCList, _, _}) ->
 	vcl_counter(Node, VCList).
 
--spec vcl_counter(atom(), list()) -> integer().
 vcl_counter(Node, VCList) ->
 	{Node, Counter} = lists:keyfind(Node, 1, VCList),
 	Counter.
