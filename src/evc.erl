@@ -33,7 +33,7 @@ increment(VC) ->
 
 increment(NodeTime, {VCList, TA, {Node, LastNodeTime}}) ->
   TimeShift = NodeTime - LastNodeTime,
-  NewVCList = lists:keyreplace(Node, 1, VCList, {Node, counter(Node, VCList) + 1}),
+  NewVCList = lists:keyreplace(Node, 1, VCList, {Node, counter_from_list(Node, VCList) + 1}),
   {NewVCList, TA + TimeShift, {Node, NodeTime}}.
 
 -spec node_id(evc()) -> atom().
@@ -42,10 +42,14 @@ node_id({_, _, {Node, _}}) ->
 
 -spec counter(evc()) -> integer().
 counter({VCList, _, {Node, _}}) ->
-  counter(Node, VCList).
+  counter_from_list(Node, VCList).
 
--spec counter(atom(), list()) -> integer().
-counter(Node, VCList) ->
+-spec counter(atom(), evc()) -> integer().
+counter(Node, {VCList, _, _}) ->
+    counter_from_list(Node, VCList).
+
+-spec counter_from_list(atom(), list()) -> integer().
+counter_from_list(Node, VCList) ->
   {Node, Counter} = lists:keyfind(Node, 1, VCList),
   Counter.
 
