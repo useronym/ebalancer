@@ -92,7 +92,7 @@ handle_cast({send_tcp, From, Data}, State = #state{buffer = Buffer}) ->
     {noreply, State#state{vc = IncVC, buffer = [{IncVC, From, Data} | Buffer]}};
 
 handle_cast({notify, VC}, State) ->
-    NewVC = evc:merge(State#state.vc, VC),
+    NewVC = evc:merge(State#state.vc, VC, 0),
     {noreply, State#state{vc = NewVC}}.
 
 

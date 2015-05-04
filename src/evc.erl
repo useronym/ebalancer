@@ -14,7 +14,7 @@
 -define(DEFAULT_SIZE, 4).
 
 %% API
--export([perf1/0, new/1, increment/1, node_id/1, counter/1, counter/2, merge/2, merge/3, compare/2]).
+-export([perf1/0, new/1, increment/1, node_id/1, counter/1, counter/2, merge/3, compare/2]).
 
 -type timestamp() :: integer().
 -type evc() :: {list(), timestamp(), {atom(), timestamp()}}.
@@ -52,10 +52,6 @@ counter(Node, {VCList, _, _}) ->
 counter_from_list(Node, VCList) ->
   {Node, Counter} = lists:keyfind(Node, 1, VCList),
   Counter.
-
--spec merge(evc(), evc()) -> evc().
-merge(VC1, VC2) ->
-  merge(timestamp(), VC1, VC2, 0).
 
 -spec merge(evc(), evc(), integer()) -> evc().
 merge(VC1, VC2, RTTDelta) ->
@@ -130,7 +126,7 @@ perf1() ->
   timer:sleep(500),
   Node1_VC2 = {_, TA1, _} = evc:increment(Node1_VC1),
   Node4New = new(node4),
-  Node4_VC1 = merge(Node4New, Node1_VC2, TA1),
+  Node4_VC1 = evc:merge(Node4New, Node1_VC2, TA1),
   timer:sleep(500),
   Evcincrement1 = evc:increment(Node1_VC2),
   Node1_VC3 = evc:increment(Evcincrement1),
@@ -139,10 +135,10 @@ perf1() ->
   io:format("~140p~n", [[{Node1_VC3}, {Node4_VC2}]]),
   timer:sleep(500),
   Node1_VC4 = evc:increment(Node1_VC3),
-  Merge1 = merge(Node4_VC2, Node1_VC4),
+  Merge1 = evc:merge(Node4_VC2, Node1_VC4, 0),
   Node4_VC3 = evc:increment(Merge1),
   io:format("~140p~n", [[{Node1_VC4}, {Node4_VC3}]]),
-  Merge2 = merge(Node1_VC4, Node4_VC3),
+  Merge2 = evc:merge(Node1_VC4, Node4_VC3, 0),
   timer:sleep(100),
   Node1_VC5 = evc:increment(Merge2),
   Node4_VC4 = evc:increment(Node4_VC3),
@@ -173,7 +169,7 @@ compare_test() ->
   ?assert(evc:compare(B, B1)),
   ?assert(evc:compare(A1, B1)),
   A2 = evc:increment(A1),
-  C = evc:merge(A2, B1),
+  C = evc:merge(A2, B1, 0),
   C1 = evc:increment(C),
   ?assertEqual(2, counter(A2)),
   ?assertEqual(3, counter(C1)),
