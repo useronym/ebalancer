@@ -80,7 +80,7 @@ handle_call({take_msgs, MaxVC}, _From, State) ->
             {reply, [], State};
         _ ->
             {MinVC, _, _} = hd(NewMsgs),
-            Count = evc:counter(evc:node_id(MinVC), MaxVC) - evc:counter(MinVC),
+            Count = evc:counter(evc:node_id(MinVC), MaxVC) - evc:counter(node(), MinVC),
             {Taken, Left} = lists:split(max(0, Count), NewMsgs),
             {reply, Taken, State#state{msgs = Left, buffer = []}}
     end.
