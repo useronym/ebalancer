@@ -13,9 +13,9 @@
 -export([test_perf/0, rhash/3]).
 
 %% Key to be hashed, Nodes list, Number of nodes to be returned
-rhash(Key, Nodes, N) when N > L = length(Nodes) ->
-	rhash(Key, Nodes, L);
 rhash(Key, Nodes, N) ->
+	rhash1(Key, Nodes, min(N, length(Nodes))).
+rhash1(Key, Nodes, N) ->
 	L = lists:map(fun(Node) -> {erlang:phash2({Key, Node}), Node} end, Nodes),
 	lists:sublist(lists:reverse(lists:sort(L)), N).
 
