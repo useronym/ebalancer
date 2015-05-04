@@ -12,12 +12,9 @@
 %% API
 -export([test_perf/0, rhash/3]).
 
-%% Key to be hashed, Nodes list, Number of nodes to be returned
 rhash(Key, Nodes, N) ->
-	rhash1(Key, Nodes, min(N, length(Nodes))).
-rhash1(Key, Nodes, N) ->
 	L = lists:map(fun(Node) -> {erlang:phash2({Key, Node}), Node} end, Nodes),
-	lists:sublist(lists:reverse(lists:sort(L)), N).
+	lists:sublist(lists:reverse(lists:sort(L)), erlang:min(N, length(Nodes))).
 
 test_perf() ->
 	Nodes = [wpOVXYm7@localhost, bhcEl1lA@localhost, ho867Kea@localhost, uLVveyEU@localhost, hxKaLQJt@localhost, czcygmSN@localhost, nQiDurbv@localhost, wa7HNV78@localhost, zBQV3nK7@localhost, igmpo7HK@localhost, lwSDik8N@localhost, kCUL08B1@localhost, oTUzmJKK@localhost, le2nXy0s@localhost, hUlYX2zH@localhost, iwBcOLou@localhost, wMvkso2i@localhost, gEsDFsrr@localhost, aPsJI4Gx@localhost],
