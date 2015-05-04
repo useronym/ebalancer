@@ -167,8 +167,8 @@ compare_test() ->
 	A2 = evc:increment(A1),
 	C = evc:merge(A2, B1, 0),
 	C1 = evc:increment(C),
-	?assertEqual(2, counter(A2)),
-	?assertEqual(3, counter(C1)),
+	?assertEqual(2, evc:counter(evc:node_id(A2), A2)),
+	?assertEqual(3, evc:counter(evc:node_id(C1), C1)),
 	?assert(evc:compare(A2, C1)),
 	?assert(evc:compare(B1, C1)),
 	?assertNot(evc:compare(C1, B1)),
@@ -176,9 +176,9 @@ compare_test() ->
 
 simple_test() ->
 	VC1 = evc:increment(evc:new(1)),
-	?assertEqual(1, evc:counter(VC1)),
+	?assertEqual(1, evc:counter(evc:node_id(VC1), VC1)),
 	VC2 = evc:increment(VC1),
-	?assertEqual(2, counter(VC2)).
+	?assertEqual(2, evc:counter(evc:node_id(VC2), VC2)).
 
 vcl_merge_test() ->
 	VC1 = [{node1, 1}, {node2, 2}, {node4, 4}],
