@@ -13,7 +13,7 @@
 -export([test_perf/0, rhash/3]).
 
 rhash(Key, Nodes, N) ->
-	L = lists:map(fun(Node) -> {erlang:phash2({Key, Node}), Node} end, Nodes),
+    L = [{erlang:phash2({Key, Node}), Node} || Node <- Nodes],
 	lists:sublist(lists:reverse(lists:sort(L)), erlang:min(N, length(Nodes))).
 
 test_perf() ->
