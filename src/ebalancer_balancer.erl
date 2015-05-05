@@ -1,4 +1,4 @@
--module(ebalancer_controller).
+-module(ebalancer_balancer).
 
 -behaviour(gen_server).
 
@@ -14,8 +14,6 @@
     buffer = []
 }).
 
-%% When this limit is reached, the controller will request a collection process.
--define(MSG_LIMIT, 5000).
 
 %%%-----------------------------------------------------------------------------
 %%% API functions
@@ -28,7 +26,7 @@ start_link() ->
 send_tcp(From, Data) ->
     gen_server:cast(?MODULE, {send_tcp, From, Data}).
 
-%% Notify controller on another node, forcing it to update it's vector clock.
+%% Notify balancer on another node, forcing it to update it's vector clock.
 notify(Node, VC) ->
     gen_server:cast({?MODULE, Node}, {notify, VC}).
 
@@ -88,7 +86,7 @@ handle_call({take_msgs, MaxVC}, _From, State) ->
 
 handle_cast({send_tcp, From, Data}, State = #state{buffer = Buffer}) ->
     IncVC = evc:increment(State#state.vc),
-    ebalancer_controller:notify(random(nodes()), IncVC),
+    ebalancer_balancer:notify(random(nodes()), IncVC),
     {noreply, State#state{vc = IncVC, buffer = [{IncVC, From, Data} | Buffer]}};
 
 handle_cast({notify, VC}, State) ->

@@ -29,7 +29,7 @@ handle_accept(_Socket, Name) ->
 
 %% @private
 handle_tcp(_Socket, Data, State) ->
-    ebalancer_controller:send_tcp(State#state.name, Data),
+    ebalancer_balancer:send_tcp(State#state.name, Data),
     {ok, State}.
 
 %% @private
