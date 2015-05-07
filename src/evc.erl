@@ -16,8 +16,10 @@
 %% API
 -export([perf1/0, new/1, increment/1, node_id/1, counter/2, merge/3, compare/2]).
 
+-type counter() :: {atom(), integer()}.
 -type timestamp() :: integer().
--type evc() :: {list(), timestamp(), {atom(), timestamp()}}.
+
+-type evc() :: {[counter()], timestamp(), {atom(), timestamp()}}.
 
 -spec new(atom()) -> evc().
 new(Node) ->
