@@ -4,7 +4,14 @@ bench(Name, Fun, Trials) ->
     print_result(Name, repeat_tc(Fun, Trials)).
 
 repeat_tc(Fun, Trials) ->
-    timer:tc(fun() -> repeat(Trials, Fun) end).
+    Pid = self(),
+    spawn_link(fun() ->
+        Pid ! {result, timer:tc(fun() -> repeat(Trials, Fun) end)}
+        end),
+    receive
+        {result, Time} ->
+            Time
+    end.
 
 repeat(0, _Fun) -> ok;
 repeat(N, Fun) -> Fun(), repeat(N - 1, Fun).
