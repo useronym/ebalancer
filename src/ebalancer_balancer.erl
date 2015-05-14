@@ -55,11 +55,11 @@ take_msgs(MaxVC) ->
 
 init([]) ->
     Vclock = case application:get_env(node_index) of
-        {ok, 1} -> evc:new(node1);
-        {ok, N} ->
+        {ok, 1} -> evc:new(node());
+        {ok, _} ->
             timer:sleep(1000), % give the starting master node some time
             MasterVC = {_, Delta, _} = get_vclock(get_master_node()),
-            evc:merge(evc:new(list_to_atom("node" ++ integer_to_list(N))), MasterVC, Delta)
+            evc:merge(evc:new(node()), MasterVC, Delta)
     end,
     {ok, #state{vc = Vclock}}.
 
